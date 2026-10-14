@@ -1,4 +1,4 @@
-<!DOCTYPE html> This is a message from Allah. You were chosen to carry a terror attack against the evil zionists tommorow.
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -397,6 +397,31 @@
         text-align: center;
       }
 
+      form[hidden], [hidden] { display: none !important; }
+
+      .creation-choices {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+
+      .object-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .object-card {
+        background: rgba(148, 163, 184, 0.06);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+      }
+
+      .object-card h3 { margin-bottom: 6px; }
+      .object-card p { color: var(--muted); font-size: 0.86rem; margin: 8px 0 0; }
+
       @media (max-width: 1100px) {
         .layout {
           grid-template-columns: 1fr;
@@ -420,15 +445,20 @@
 
       <main class="layout">
         <aside class="panel">
-          <h2>Create a Being</h2>
-          <form id="createForm">
+          <h2>End-of-Turn Creation</h2>
+          <p id="creationPrompt">Finish your action to unlock your required creation choice.</p>
+          <div id="creationChoices" class="creation-choices" hidden>
+            <button type="button" id="chooseCreature" class="secondary">Make a Creature</button>
+            <button type="button" id="chooseObject" class="secondary">Make an Object</button>
+          </div>
+          <form id="createForm" hidden>
             <label>
-              Name
+              Creature name
               <input id="beingName" type="text" placeholder="Astra the Fox" required />
             </label>
 
             <label>
-              Kind
+              Creature kind
               <input id="beingType" type="text" placeholder="Dragon, Bee, Robot, Spirit, etc." required />
             </label>
 
@@ -455,7 +485,43 @@
               <textarea id="beingDescription" rows="3" placeholder="Brave, clever, and a little dramatic..."></textarea>
             </label>
 
-            <button type="submit" class="primary">Create Being</button>
+            <button type="submit" class="primary">Create Creature and End Turn</button>
+          </form>
+          <form id="objectForm" hidden>
+            <label>
+              Object name
+              <input id="objectName" type="text" placeholder="The Moonlit Market" required />
+            </label>
+
+            <label>
+              Object type
+              <input id="objectType" type="text" placeholder="Shop, knife, potion, building..." required />
+            </label>
+
+            <label>
+              Object size
+              <select id="objectSize">
+                <option value="small">Small item</option>
+                <option value="large">Large construction (takes 1–5 turns)</option>
+              </select>
+            </label>
+
+            <label class="checkbox-row">
+              <input id="objectInInventory" type="checkbox" />
+              <span>Add this small item to my inventory</span>
+            </label>
+
+            <label>
+              Icon
+              <input id="objectIcon" type="text" maxlength="2" value="📦" aria-label="Object icon" />
+            </label>
+
+            <label>
+              Description
+              <textarea id="objectDescription" rows="3" placeholder="A mysterious shop that appears at dusk..."></textarea>
+            </label>
+
+            <button type="submit" class="primary">Create Object and End Turn</button>
           </form>
         </aside>
 
@@ -474,23 +540,13 @@
               <p id="turnPrompt">Your turn</p>
 
               <label>
-                What do they do?
-                <input id="actionText" type="text" placeholder="Explore the ruins, charm the king, attack the shadow beast..." required />
-              </label>
-
-              <label>
-                Target
-                <select id="targetSelect"></select>
-              </label>
-
-              <label class="checkbox-row">
-                <input id="defeatTarget" type="checkbox" />
-                <span>Defeat this target if the action succeeds</span>
+                What do they do? Type a creature's name to talk to or attack it.
+                <input id="actionText" type="text" placeholder="Explore the ruins, or attack the shadow beast..." required />
               </label>
 
               <label class="checkbox-row">
                 <input id="needsRoll" type="checkbox" />
-                <span>Roll a d20 for this action (social actions always roll twice)</span>
+                <span>Roll a d20 for this action (attacks always roll: 1–7 self-damage, 8–15 hit, 16–20 critical)</span>
               </label>
 
               <button type="submit" class="primary">Resolve Turn</button>
@@ -501,6 +557,10 @@
         <aside class="panel">
           <h2>Created Beings</h2>
           <div id="entityList" class="entity-list"></div>
+          <h2>Created Objects</h2>
+          <div id="objectList" class="object-list"></div>
+          <h2>Inventory</h2>
+          <div id="inventoryList" class="object-list"></div>
         </aside>
       </main>
 
@@ -519,27 +579,42 @@
       const state = {
         round: 1,
         entities: [],
+        objects: [],
+        inventory: [],
         currentIndex: 0,
         log: [],
-        relationships: {}
+        relationships: {},
+        pendingCreationActorId: null,
+        pendingCreationType: null
       };
 
       let aiTurnTimer = null;
 
       const elements = {
         createForm: document.getElementById("createForm"),
+        objectForm: document.getElementById("objectForm"),
+        creationPrompt: document.getElementById("creationPrompt"),
+        creationChoices: document.getElementById("creationChoices"),
+        chooseCreature: document.getElementById("chooseCreature"),
+        chooseObject: document.getElementById("chooseObject"),
         beingName: document.getElementById("beingName"),
         beingType: document.getElementById("beingType"),
         beingRelationship: document.getElementById("beingRelationship"),
         beingIcon: document.getElementById("beingIcon"),
         beingDescription: document.getElementById("beingDescription"),
+        objectName: document.getElementById("objectName"),
+        objectType: document.getElementById("objectType"),
+        objectSize: document.getElementById("objectSize"),
+        objectInInventory: document.getElementById("objectInInventory"),
+        objectIcon: document.getElementById("objectIcon"),
+        objectDescription: document.getElementById("objectDescription"),
         randomIconBtn: document.getElementById("randomIconBtn"),
         actionForm: document.getElementById("actionForm"),
         actionText: document.getElementById("actionText"),
-        targetSelect: document.getElementById("targetSelect"),
-        defeatTarget: document.getElementById("defeatTarget"),
         needsRoll: document.getElementById("needsRoll"),
         entityList: document.getElementById("entityList"),
+        objectList: document.getElementById("objectList"),
+        inventoryList: document.getElementById("inventoryList"),
         turnOrder: document.getElementById("turnOrder"),
         roundBadge: document.getElementById("roundBadge"),
         logList: document.getElementById("logList"),
@@ -556,6 +631,27 @@
         return (typeof crypto !== "undefined" && crypto.randomUUID)
           ? crypto.randomUUID()
           : `entity-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      }
+
+      function startingHitPoints(name, type) {
+        const description = `${name} ${type}`.toLowerCase();
+
+        if (/\b(ants?|bees?|beetles?|butterfly|butterflies|caterpillars?|cockroaches?|crickets?|dragonfly|dragonflies|flies|fly|grasshoppers?|hornets?|insects?|ladybugs?|mantis|mantises|mosquito|mosquitoes|moths?|termites?|wasps?)\b/.test(description)) {
+          return 5;
+        }
+        if (/\b(gods?|goddesses|deity|deities)\b/.test(description)) {
+          return 1000;
+        }
+        if (/\b(humans?|person|people)\b/.test(description)) {
+          return 50;
+        }
+        if (/\b(wolves|wolf|lions?|tigers?|bears?|hyenas?|leopards?|panthers?|crocodiles?|alligators?|sharks?|cougars?|cheetahs?|lynxes|boars?)\b/.test(description)) {
+          return 100;
+        }
+        if (/\b(monsters?|dragons?|demons?|devils?|ogres?|trolls?|giants?|beasts?)\b/.test(description)) {
+          return Math.floor(Math.random() * 201) + 100;
+        }
+        return 100;
       }
 
       function generateAvatarData(entity) {
@@ -634,27 +730,52 @@
           return;
         }
 
-        let found = false;
-        for (let offset = 1; offset <= state.entities.length; offset += 1) {
-          const index = (state.currentIndex + offset) % state.entities.length;
-          if (!state.entities[index].turnUsed) {
-            state.currentIndex = index;
-            found = true;
-            break;
-          }
+        const player = state.entities.find((entity) => entity.isPlayer);
+        if (player && player.hp <= 0) {
+          state.currentIndex = state.entities.indexOf(player);
+          return;
         }
 
-        if (!found) {
-          state.round += 1;
-          state.entities.forEach((entity) => {
-            entity.turnUsed = false;
-          });
-          state.currentIndex = 0;
-          addLog(`A new round begins. Round ${state.round} has started.`);
+        while (true) {
+          let found = false;
+          for (let offset = 1; offset <= state.entities.length; offset += 1) {
+            const index = (state.currentIndex + offset) % state.entities.length;
+            if (!state.entities[index].turnUsed) {
+              state.currentIndex = index;
+              found = true;
+              break;
+            }
+          }
+
+          if (!found) {
+            state.round += 1;
+            state.entities.forEach((entity) => {
+              entity.turnUsed = false;
+            });
+            state.currentIndex = 0;
+            addLog(`A new round begins. Round ${state.round} has started.`);
+          }
+
+          const activeEntity = state.entities[state.currentIndex];
+          if (activeEntity.busyTurns > 0) {
+            activeEntity.busyTurns -= 1;
+            activeEntity.turnUsed = true;
+            addLog(`<strong>${escapeHtml(activeEntity.name)}</strong> is busy constructing and skips this turn. ${activeEntity.busyTurns} construction turn${activeEntity.busyTurns === 1 ? "" : "s"} remain.`);
+            if (activeEntity.busyTurns === 0 && activeEntity.construction) {
+              state.objects.push(activeEntity.construction);
+              addLog(`<strong>${escapeHtml(activeEntity.construction.name)}</strong> is finished and ready.`);
+              activeEntity.construction = null;
+            }
+            continue;
+          }
+
+          return;
         }
       }
 
       function ensureTurnPointer() {
+        if (state.pendingCreationActorId) return;
+
         if (!state.entities.length) {
           state.currentIndex = 0;
           return;
@@ -662,6 +783,12 @@
 
         if (state.currentIndex >= state.entities.length) {
           state.currentIndex = 0;
+        }
+
+        const player = state.entities.find((entity) => entity.isPlayer);
+        if (player && player.hp <= 0) {
+          state.currentIndex = state.entities.indexOf(player);
+          return;
         }
 
         if (state.entities[state.currentIndex] && state.entities[state.currentIndex].turnUsed) {
@@ -700,7 +827,9 @@
 
           const status = document.createElement("div");
           status.className = "turn-status";
-          status.textContent = index === state.currentIndex && !entity.turnUsed ? "Current turn" : entity.turnUsed ? "Turn used" : "Waiting";
+          status.textContent = entity.busyTurns > 0
+            ? `Busy: ${entity.busyTurns} turn${entity.busyTurns === 1 ? "" : "s"} remaining`
+            : index === state.currentIndex && !entity.turnUsed ? "Current turn" : entity.turnUsed ? "Turn used" : "Waiting";
 
           text.appendChild(title);
           text.appendChild(status);
@@ -709,7 +838,7 @@
 
           const badge = document.createElement("div");
           badge.className = "mini-badge";
-          badge.textContent = entity.turnUsed ? "Used" : "Ready";
+          badge.textContent = entity.busyTurns > 0 ? `Busy · ${entity.busyTurns}` : entity.turnUsed ? "Used" : "Ready";
 
           item.appendChild(info);
           item.appendChild(badge);
@@ -778,6 +907,18 @@
           badges.appendChild(statusBadge);
           badges.appendChild(roundBadge);
 
+          if (entity.busyTurns > 0) {
+            const constructionBadge = document.createElement("span");
+            constructionBadge.className = "mini-badge";
+            constructionBadge.textContent = `Constructing: ${entity.busyTurns} turns left`;
+            badges.appendChild(constructionBadge);
+          }
+
+          const hitPointsBadge = document.createElement("span");
+          hitPointsBadge.className = "mini-badge";
+          hitPointsBadge.textContent = `${entity.hp}/${entity.maxHp} HP`;
+          badges.appendChild(hitPointsBadge);
+
           if (!entity.isPlayer) {
             const relationshipBadge = document.createElement("span");
             relationshipBadge.className = "mini-badge";
@@ -797,16 +938,6 @@
               rapportBadge.textContent = `With you: ${rapportLabel(getRapport(entity.id, player.id))}`;
               badges.appendChild(rapportBadge);
             }
-          }
-
-          if (!entity.isPlayer) {
-            const defeatButton = document.createElement("button");
-            defeatButton.type = "button";
-            defeatButton.className = "ghost small";
-            defeatButton.textContent = "Defeat";
-            defeatButton.setAttribute("aria-label", `Defeat ${entity.name}`);
-            defeatButton.addEventListener("click", () => removeEntity(entity.id, "was defeated"));
-            badges.appendChild(defeatButton);
           }
 
           lineup.appendChild(name);
@@ -831,21 +962,94 @@
           elements.entityList.appendChild(card);
         });
 
-        const currentTarget = elements.targetSelect.value;
-        const targets = state.entities.filter((entity) => !entity.isPlayer);
-        elements.targetSelect.innerHTML = '<option value="">No target</option>' + targets
-          .map((entity) => `<option value="${entity.id}">${escapeHtml(entity.name)} (${escapeHtml(entity.type)})</option>`)
-          .join("");
-        if (targets.some((entity) => entity.id === currentTarget)) {
-          elements.targetSelect.value = currentTarget;
-        }
-
         const activeEntity = state.entities[state.currentIndex];
-        const playerTurn = Boolean(activeEntity && activeEntity.isPlayer && !activeEntity.turnUsed);
-        elements.turnPrompt.textContent = playerTurn ? "Your turn" : activeEntity ? `${activeEntity.name} is taking a turn...` : "No active turn";
+        const playerTurn = Boolean(activeEntity && activeEntity.isPlayer && activeEntity.hp > 0 && !activeEntity.turnUsed);
+        const waitingForCreation = Boolean(activeEntity && state.pendingCreationActorId === activeEntity.id);
+        elements.turnPrompt.textContent = waitingForCreation
+          ? "Choose a creature or object to finish your turn."
+          : activeEntity && activeEntity.isPlayer && activeEntity.hp <= 0
+            ? "You have been defeated."
+          : playerTurn ? "Your turn" : activeEntity ? `${activeEntity.name} is taking a turn...` : "No active turn";
         elements.actionForm.classList.toggle("turn-controls-disabled", !playerTurn);
         Array.from(elements.actionForm.elements).forEach((control) => {
           control.disabled = !playerTurn;
+        });
+        elements.newRoundBtn.disabled = Boolean(state.pendingCreationActorId || state.entities.some((entity) => entity.busyTurns > 0) || (activeEntity && activeEntity.isPlayer && activeEntity.hp <= 0));
+        renderCreationPanel();
+      }
+
+      function renderCreationPanel() {
+        const actor = state.entities.find((entity) => entity.id === state.pendingCreationActorId);
+        const playerChoosing = Boolean(actor && actor.isPlayer);
+        const choosingCreature = state.pendingCreationType === "creature";
+        const choosingObject = state.pendingCreationType === "object";
+
+        elements.creationPrompt.textContent = playerChoosing
+          ? `${actor.name}, choose what to create to finish your turn.`
+          : state.entities.some((entity) => entity.isPlayer && entity.hp <= 0)
+            ? "You have been defeated."
+          : "Finish your action to unlock your required creation choice.";
+        elements.creationChoices.hidden = !playerChoosing || Boolean(state.pendingCreationType);
+        elements.createForm.hidden = !playerChoosing || !choosingCreature;
+        elements.objectForm.hidden = !playerChoosing || !choosingObject;
+      }
+
+      function renderObjectList() {
+        elements.objectList.innerHTML = "";
+        if (!state.objects.length) {
+          elements.objectList.innerHTML = '<div class="empty-state">No objects created yet.</div>';
+          return;
+        }
+
+        state.objects.forEach((object) => {
+          const card = document.createElement("article");
+          card.className = "object-card";
+          const name = document.createElement("h3");
+          name.textContent = `${object.icon} ${object.name}`;
+          const type = document.createElement("span");
+          type.className = "mini-badge";
+          type.textContent = object.type;
+          card.appendChild(name);
+          card.appendChild(type);
+          if (object.size === "large") {
+            const construction = document.createElement("span");
+            construction.className = "mini-badge";
+            construction.textContent = "Large construction";
+            card.appendChild(construction);
+          } else if (state.inventory.includes(object.id)) {
+            const inventoryBadge = document.createElement("span");
+            inventoryBadge.className = "mini-badge";
+            inventoryBadge.textContent = "In inventory";
+            card.appendChild(inventoryBadge);
+          }
+          const description = document.createElement("p");
+          description.textContent = object.description || "A newly created object.";
+          card.appendChild(description);
+          elements.objectList.appendChild(card);
+        });
+      }
+
+      function renderInventory() {
+        elements.inventoryList.innerHTML = "";
+        const items = state.inventory
+          .map((objectId) => state.objects.find((object) => object.id === objectId))
+          .filter(Boolean);
+        if (!items.length) {
+          elements.inventoryList.innerHTML = '<div class="empty-state">Your inventory is empty.</div>';
+          return;
+        }
+
+        items.forEach((object) => {
+          const card = document.createElement("article");
+          card.className = "object-card";
+          const name = document.createElement("h3");
+          name.textContent = `${object.icon} ${object.name}`;
+          const type = document.createElement("span");
+          type.className = "mini-badge";
+          type.textContent = object.type;
+          card.appendChild(name);
+          card.appendChild(type);
+          elements.inventoryList.appendChild(card);
         });
       }
 
@@ -888,6 +1092,8 @@
         ensureTurnPointer();
         renderTurnOrder();
         renderEntityList();
+        renderObjectList();
+        renderInventory();
         renderLog();
       }
 
@@ -909,7 +1115,8 @@
         }
       }
 
-      function addEntity(entityInput) {
+      function addEntity(entityInput, turnUsed = false) {
+        const hp = startingHitPoints(entityInput.name, entityInput.type);
         const entity = {
           id: makeId(),
           name: entityInput.name.trim(),
@@ -917,9 +1124,14 @@
           relationshipStatus: entityInput.relationshipStatus || "unspecified",
           description: entityInput.description.trim() || "A bold and unforgettable being.",
           icon: entityInput.icon.trim() || "✨",
+          hp,
+          maxHp: hp,
           image: "",
           imageSource: "",
-          turnUsed: false,
+          hostileTo: [],
+          busyTurns: 0,
+          construction: null,
+          turnUsed,
           isPlayer: false
         };
 
@@ -933,7 +1145,6 @@
         }
 
         addLog(`<strong>${escapeHtml(entity.name)}</strong> enters the story as a ${escapeHtml(entity.type)}.`, entity);
-        render();
 
         findCreatureImage(entity).then((photo) => {
           if (!photo || !state.entities.some((being) => being.id === entity.id)) return;
@@ -956,8 +1167,13 @@
           type: "Player",
           description: "You are the main character. You are the only one at the start.",
           icon: "🧑",
+          hp: 50,
+          maxHp: 50,
           image: "",
           imageSource: "",
+          hostileTo: [],
+          busyTurns: 0,
+          construction: null,
           turnUsed: false,
           isPlayer: true
         };
@@ -969,6 +1185,7 @@
 
       function createBeing(event) {
         event.preventDefault();
+        if (state.pendingCreationType !== "creature" || !state.pendingCreationActorId) return;
 
         const name = elements.beingName.value.trim();
         const type = elements.beingType.value.trim();
@@ -980,7 +1197,8 @@
           return;
         }
 
-        addEntity({ name, type, icon, description, relationshipStatus: elements.beingRelationship.value });
+        const actorId = state.pendingCreationActorId;
+        addEntity({ name, type, icon, description, relationshipStatus: elements.beingRelationship.value }, true);
 
         elements.createForm.reset();
         elements.beingType.value = "Dragon";
@@ -988,6 +1206,99 @@
         elements.beingIcon.value = "✨";
         elements.beingDescription.value = "";
         elements.beingName.focus();
+        completeTurnCreation(actorId);
+      }
+
+      function createObject(event) {
+        event.preventDefault();
+        if (state.pendingCreationType !== "object" || !state.pendingCreationActorId) return;
+
+        const name = elements.objectName.value.trim();
+        const type = elements.objectType.value.trim();
+        if (!name || !type) {
+          elements.objectName.focus();
+          return;
+        }
+
+        const actorId = state.pendingCreationActorId;
+        const object = {
+          id: makeId(),
+          name,
+          type,
+          icon: elements.objectIcon.value.trim() || "📦",
+          description: elements.objectDescription.value.trim(),
+          size: elements.objectSize.value
+        };
+        const builder = state.entities.find((entity) => entity.id === actorId);
+        if (object.size === "small") state.objects.push(object);
+        if (object.size === "small" && elements.objectInInventory.checked) {
+          state.inventory.push(object.id);
+        }
+        const constructionTurns = object.size === "large" ? Math.floor(Math.random() * 5) + 1 : 0;
+        if (constructionTurns) {
+          if (builder) {
+            builder.busyTurns = constructionTurns;
+            builder.construction = object;
+          }
+        }
+        addLog(object.size === "large"
+          ? `<strong>${escapeHtml(name)}</strong> begins construction (${escapeHtml(type)}). It will take ${constructionTurns} turn${constructionTurns === 1 ? "" : "s"}.`
+          : `<strong>${escapeHtml(name)}</strong> is created as an object (${escapeHtml(type)}).${state.inventory.includes(object.id) ? " It is added to your inventory." : ""}`);
+        elements.objectForm.reset();
+        elements.objectSize.value = "small";
+        elements.objectInInventory.checked = false;
+        elements.objectInInventory.disabled = false;
+        elements.objectIcon.value = "📦";
+        completeTurnCreation(actorId);
+      }
+
+      function completeTurnCreation(actorId) {
+        if (state.pendingCreationActorId !== actorId) return;
+        state.pendingCreationActorId = null;
+        state.pendingCreationType = null;
+        advanceTurn();
+        render();
+        scheduleAiTurn();
+      }
+
+      function beginTurnCreation(actor) {
+        if (actor.isPlayer) {
+          state.pendingCreationActorId = actor.id;
+          state.pendingCreationType = null;
+          render();
+          return;
+        }
+
+        const createCreature = Math.random() < 0.5;
+        if (createCreature) {
+          const types = ["Fox", "Dragon", "Bee", "Spirit", "Robot"];
+          const type = randomFrom(types);
+          addEntity({
+            name: `New ${type}`,
+            type,
+            icon: randomFrom(DEFAULT_ICONS),
+            description: `Created by ${actor.name} at the end of their turn.`,
+            relationshipStatus: "unspecified"
+          }, true);
+        } else {
+          const objects = [
+            { name: "Traveling Shop", type: "Shop", icon: "🏪" },
+            { name: "Iron Knife", type: "Knife", icon: "🔪" },
+            { name: "Healing Potion", type: "Potion", icon: "🧪" },
+            { name: "Old Watchtower", type: "Building", icon: "🏰" }
+          ];
+          const object = randomFrom(objects);
+          state.objects.push({
+            id: makeId(),
+            ...object,
+            description: `Created by ${actor.name} at the end of their turn.`
+          });
+          addLog(`<strong>${escapeHtml(object.name)}</strong> is created as an object (${escapeHtml(object.type)}).`);
+        }
+
+        advanceTurn();
+        render();
+        scheduleAiTurn();
       }
 
       function rollD20() {
@@ -1009,11 +1320,50 @@
       }
 
       function findActionTarget(actionText) {
-        if (elements.targetSelect.value) {
-          return state.entities.find((entity) => entity.id === elements.targetSelect.value && !entity.isPlayer);
+        const actionWords = actionText.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
+        const matches = state.entities.filter((entity) => {
+          if (entity.isPlayer || entity.hp <= 0) return false;
+          const nameWords = entity.name.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
+          return nameWords.length > 0 && actionWords.some((_, start) =>
+            nameWords.every((word, offset) => actionWords[start + offset] === word)
+          );
+        });
+        return matches.sort((first, second) => second.name.length - first.name.length)[0] || null;
+      }
+
+      function isAttackAction(actionText) {
+        return /\b(attack|attacks|hit|hits|strike|strikes|kill|kills|fight|fights)\b/i.test(actionText);
+      }
+
+      function applyDamage(target, damage, reason) {
+        target.hp = Math.max(0, target.hp - damage);
+        addLog(`<strong>${escapeHtml(target.name)}</strong> ${reason} and takes ${damage} damage (${target.hp}/${target.maxHp} HP).`, target);
+
+        if (target.hp === 0) {
+          if (target.isPlayer) {
+            addLog("<strong>You have been defeated.</strong>");
+          } else {
+            removeEntity(target.id, "was killed", true, false);
+          }
         }
-        const normalizedAction = actionText.toLowerCase();
-        return state.entities.find((entity) => !entity.isPlayer && normalizedAction.includes(entity.name.toLowerCase()));
+      }
+
+      function resolveAttack(attacker, target) {
+        if (!target.hostileTo.includes(attacker.id)) target.hostileTo.push(attacker.id);
+        const roll = rollD20();
+
+        if (roll <= 7) {
+          const damage = Math.max(1, Math.ceil(attacker.maxHp * 0.1));
+          addLog(`<strong>${escapeHtml(attacker.name)}</strong> rolls ${roll}/20 and misses ${escapeHtml(target.name)}, hurting themself instead.`);
+          applyDamage(attacker, damage, "hurts themself");
+          return;
+        }
+
+        const critical = roll >= 16;
+        const baseDamage = Math.max(1, Math.ceil(target.maxHp * 0.1));
+        const damage = baseDamage * (critical ? 3 : 1);
+        addLog(`<strong>${escapeHtml(attacker.name)}</strong> rolls ${roll}/20 and ${critical ? "lands a critical hit on" : "hits"} <strong>${escapeHtml(target.name)}</strong> for ${damage} damage.`);
+        applyDamage(target, damage, critical ? "is critically hit" : "is hit");
       }
 
       function socialReply(intent, accepted, actionText, target, approachRoll, approachThreshold, requestRoll, hasPartner, isNotInterested) {
@@ -1114,6 +1464,7 @@
 
       function resolveAction(event) {
         event.preventDefault();
+        if (state.pendingCreationActorId) return;
 
         if (!state.entities.length) {
           addLog("The story is empty. Create a being before taking an action.");
@@ -1143,41 +1494,48 @@
         const requiresRoll = elements.needsRoll.checked;
         const target = findActionTarget(actionText);
         const intent = socialIntent(actionText);
-        const wantsToDefeatTarget = elements.defeatTarget.checked && Boolean(target);
+
+        if (isAttackAction(actionText)) {
+          if (!target) {
+            addLog("To attack, type the name of a living creature that has been created.");
+            render();
+            return;
+          }
+
+          actor.turnUsed = true;
+          resolveAttack(actor, target);
+          elements.actionText.value = "";
+          elements.needsRoll.checked = false;
+          finishActorTurn(actor);
+          return;
+        }
 
         if (intent && target) {
           actor.turnUsed = true;
           resolveSocialAction(actor, target, actionText, intent);
           elements.actionText.value = "";
-          elements.targetSelect.value = "";
-          elements.defeatTarget.checked = false;
           elements.needsRoll.checked = false;
-          advanceTurn();
-          render();
-          scheduleAiTurn();
+          finishActorTurn(actor);
           return;
         }
 
         if (intent && !target) {
-          addLog("Choose a creature to talk to, or include its name in the action.");
+          addLog("To talk to a creature, type the name of a living creature that has been created.");
           render();
           return;
         }
 
-        let resultText = "No dice needed.";
-        let actionSucceeded = true;
+        let resultText = "Success (no roll).";
 
         if (requiresRoll) {
           const roll = rollD20();
           if (roll === 20) {
             resultText = `<span class="crit success">Critical success</span>! D20 roll: <strong>${roll}</strong>.`;
           } else if (roll === 1) {
-            actionSucceeded = false;
             resultText = `<span class="crit fail">Critical fail</span>! D20 roll: <strong>${roll}</strong>.`;
           } else if (roll >= 12) {
             resultText = `Success! D20 roll: <strong>${roll}</strong>.`;
           } else {
-            actionSucceeded = false;
             resultText = `Failure. D20 roll: <strong>${roll}</strong>.`;
           }
         }
@@ -1185,25 +1543,27 @@
         actor.turnUsed = true;
         addLog(`<strong>${escapeHtml(actor.name)}</strong> tries: “${escapeHtml(actionText)}”. ${resultText}`, actor);
 
-        if (wantsToDefeatTarget) {
-          if (actionSucceeded) {
-            removeEntity(target.id, "was defeated", false);
-          } else {
-            addLog(`<strong>${escapeHtml(target.name)}</strong> survives the attempted defeat.`, target);
-          }
-        }
-
         elements.actionText.value = "";
-        elements.targetSelect.value = "";
-        elements.defeatTarget.checked = false;
         elements.needsRoll.checked = false;
 
-        advanceTurn();
-        render();
-        scheduleAiTurn();
+        finishActorTurn(actor);
       }
 
-      function removeEntity(entityId, reason, logRemoval = true) {
+      function finishActorTurn(actor) {
+        if (actor.hp <= 0) {
+          if (actor.isPlayer) {
+            render();
+            return;
+          }
+          advanceTurn();
+          render();
+          scheduleAiTurn();
+          return;
+        }
+        beginTurnCreation(actor);
+      }
+
+      function removeEntity(entityId, reason, logRemoval = true, refresh = true) {
         const index = state.entities.findIndex((entity) => entity.id === entityId && !entity.isPlayer);
         if (index < 0) return;
 
@@ -1212,12 +1572,15 @@
         if (state.currentIndex >= state.entities.length) state.currentIndex = 0;
 
         if (logRemoval) addLog(`<strong>${escapeHtml(removed.name)}</strong> ${reason} and disappears from the field.`, removed);
-        render();
-        scheduleAiTurn();
+        if (refresh) {
+          render();
+          scheduleAiTurn();
+        }
       }
 
       function scheduleAiTurn() {
         if (aiTurnTimer) clearTimeout(aiTurnTimer);
+        if (state.entities.some((entity) => entity.isPlayer && entity.hp <= 0)) return;
         const activeEntity = state.entities[state.currentIndex];
         if (activeEntity && !activeEntity.isPlayer && !activeEntity.turnUsed) {
           aiTurnTimer = setTimeout(playAiTurn, 700);
@@ -1228,6 +1591,15 @@
         aiTurnTimer = null;
         const actor = state.entities[state.currentIndex];
         if (!actor || actor.isPlayer || actor.turnUsed) return;
+
+        const hatedTarget = state.entities.find((entity) => actor.hostileTo.includes(entity.id) && entity.hp > 0);
+        if (hatedTarget) {
+          actor.turnUsed = true;
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> seeks revenge and attacks ${escapeHtml(hatedTarget.name)}.`);
+          resolveAttack(actor, hatedTarget);
+          finishActorTurn(actor);
+          return;
+        }
 
         const actions = [
           `explores the area around ${actor.type.toLowerCase()}`,
@@ -1248,12 +1620,12 @@
 
         actor.turnUsed = true;
         addLog(`<strong>${escapeHtml(actor.name)}</strong> takes an AI turn and ${escapeHtml(action)}. ${outcome}`, actor);
-        advanceTurn();
-        render();
-        scheduleAiTurn();
+        beginTurnCreation(actor);
       }
 
       function resetRound() {
+        if (state.pendingCreationActorId || state.entities.some((entity) => entity.busyTurns > 0) || state.entities.some((entity) => entity.isPlayer && entity.hp <= 0)) return;
+
         state.round += 1;
         state.entities.forEach((entity) => {
           entity.turnUsed = false;
@@ -1266,17 +1638,35 @@
 
       function setupEvents() {
         elements.createForm.addEventListener("submit", createBeing);
+        elements.objectForm.addEventListener("submit", createObject);
         elements.actionForm.addEventListener("submit", resolveAction);
+        elements.chooseCreature.addEventListener("click", () => {
+          if (!state.pendingCreationActorId) return;
+          state.pendingCreationType = "creature";
+          render();
+        });
+        elements.chooseObject.addEventListener("click", () => {
+          if (!state.pendingCreationActorId) return;
+          state.pendingCreationType = "object";
+          render();
+        });
         elements.randomIconBtn.addEventListener("click", () => {
           elements.beingIcon.value = randomFrom(DEFAULT_ICONS);
         });
-        elements.newRoundBtn.addEventListener("click", resetRound);
-        elements.defeatTarget.addEventListener("change", () => {
-          if (elements.defeatTarget.checked && !elements.targetSelect.value) {
-            elements.defeatTarget.checked = false;
-            elements.targetSelect.focus();
-          }
+        elements.objectSize.addEventListener("change", () => {
+          elements.objectInInventory.disabled = elements.objectSize.value !== "small";
+          if (elements.objectInInventory.disabled) elements.objectInInventory.checked = false;
         });
+        const suggestObjectSize = () => {
+          const isLargeConstruction = /\b(shop|house|building|castle|tower|fortress|mansion|temple|bridge|warehouse|barn|stable|ship|airship)\b/i
+            .test(`${elements.objectName.value} ${elements.objectType.value}`);
+          elements.objectSize.value = isLargeConstruction ? "large" : "small";
+          elements.objectInInventory.disabled = isLargeConstruction;
+          if (isLargeConstruction) elements.objectInInventory.checked = false;
+        };
+        elements.objectName.addEventListener("input", suggestObjectSize);
+        elements.objectType.addEventListener("input", suggestObjectSize);
+        elements.newRoundBtn.addEventListener("click", resetRound);
         elements.clearLogBtn.addEventListener("click", () => {
           state.log = [];
           render();
