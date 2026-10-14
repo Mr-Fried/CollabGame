@@ -422,6 +422,60 @@
       .object-card h3 { margin-bottom: 6px; }
       .object-card p { color: var(--muted); font-size: 0.86rem; margin: 8px 0 0; }
 
+      .pickpocket-bar {
+        height: 32px;
+        position: relative;
+        overflow: hidden;
+        background: rgba(148, 163, 184, 0.2);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        margin: 12px 0;
+      }
+
+      .pickpocket-target-zone {
+        position: absolute;
+        left: 47.5%;
+        width: 5%;
+        top: 0;
+        bottom: 0;
+        background: var(--good);
+      }
+
+      .pickpocket-slider {
+        position: absolute;
+        left: 0;
+        top: -1px;
+        bottom: -1px;
+        width: 8px;
+        background: var(--text);
+        border-radius: 4px;
+      }
+
+      dialog.modal-dialog {
+        width: min(560px, calc(100vw - 32px));
+        max-height: min(80vh, 760px);
+        overflow: auto;
+        color: var(--text);
+        background: #111a2e;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 0;
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.65);
+      }
+
+      dialog.modal-dialog::backdrop {
+        background: rgba(3, 7, 18, 0.78);
+        backdrop-filter: blur(4px);
+      }
+
+      .dialog-content { padding: 22px; }
+      .dialog-content > :last-child { margin-bottom: 0; }
+      .dialog-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
+      .inventory-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+      .inventory-item + .inventory-item { margin-top: 10px; }
+      .inventory-item-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+      .equipment-summary { color: var(--muted); margin-bottom: 14px; }
+
       @media (max-width: 1100px) {
         .layout {
           grid-template-columns: 1fr;
@@ -463,6 +517,30 @@
             </label>
 
             <label>
+              Gender
+              <select id="beingGender">
+                <option value="unspecified">Unspecified</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
+            </label>
+
+            <label>
+              Sexuality
+              <select id="beingSexuality">
+                <option value="straight">Straight</option>
+                <option value="bisexual">Bisexual</option>
+                <option value="gay">Gay</option>
+                <option value="lesbian">Lesbian</option>
+              </select>
+            </label>
+
+            <label id="humanFormLabel" class="checkbox-row" hidden>
+              <input id="beingHumanForm" type="checkbox" />
+              <span>This god has a human form</span>
+            </label>
+
+            <label>
               Relationship status
               <select id="beingRelationship">
                 <option value="unspecified">Not specified</option>
@@ -475,7 +553,7 @@
             <label>
               Icon
               <div class="icon-row">
-                <input id="beingIcon" type="text" maxlength="2" value="✨" aria-label="Icon" />
+                <input id="beingIcon" type="text" maxlength="2" value="✨" aria-label="Creature icon" readonly />
                 <button type="button" id="randomIconBtn" class="mini">Random</button>
               </div>
             </label>
@@ -504,6 +582,15 @@
                 <option value="small">Small item</option>
                 <option value="large">Large construction (takes 1–5 turns)</option>
               </select>
+            </label>
+
+            <label id="objectCategoryLabel">
+              Item type
+              <select id="objectCategory">
+                <option value="weapon">Weapon</option>
+                <option value="armor">Armor</option>
+              </select>
+              <small>Food is found by spending a turn searching, not created.</small>
             </label>
 
             <label class="checkbox-row">
@@ -551,6 +638,31 @@
 
               <button type="submit" class="primary">Resolve Turn</button>
             </form>
+            <dialog id="pickpocketDialog" class="modal-dialog">
+            <section id="pickpocketPanel" class="dialog-content">
+              <h3 id="pickpocketPrompt">Pickpocket attempt</h3>
+              <div id="pickpocketChoices" class="creation-choices">
+                <button type="button" id="pickpocketRoll" class="secondary">Roll a d20</button>
+                <button type="button" id="pickpocketMiniGame" class="secondary">Play the mini-game</button>
+              </div>
+              <div id="pickpocketGame" hidden>
+                <p>Press Space when the slider is inside the small green zone.</p>
+                <div id="pickpocketBar" class="pickpocket-bar" aria-label="Pickpocket timing bar">
+                  <div id="pickpocketTargetZone" class="pickpocket-target-zone"></div>
+                  <div id="pickpocketSlider" class="pickpocket-slider"></div>
+                </div>
+                <button type="button" id="startPickpocketGame" class="primary">Try now (Space)</button>
+              </div>
+              <div id="pickpocketLoot" hidden></div>
+            </section>
+            </dialog>
+            <dialog id="relationshipDialog" class="modal-dialog">
+            <section id="relationshipEvent" class="dialog-content">
+              <h3 id="relationshipEventTitle"></h3>
+              <p id="relationshipEventMessage"></p>
+              <div id="relationshipEventChoices" class="creation-choices"></div>
+            </section>
+            </dialog>
           </div>
         </section>
 
@@ -559,8 +671,7 @@
           <div id="entityList" class="entity-list"></div>
           <h2>Created Objects</h2>
           <div id="objectList" class="object-list"></div>
-          <h2>Inventory</h2>
-          <div id="inventoryList" class="object-list"></div>
+          <button type="button" id="openInventory" class="secondary">Open Inventory</button>
         </aside>
       </main>
 
@@ -573,22 +684,67 @@
       </section>
     </div>
 
-    <script>
-      const DEFAULT_ICONS = ["✨", "🦊", "🐉", "🦁", "🦄", "🐺", "🧙", "🛡️", "🌙", "⚡", "🌟", "🧿", "🌋", "🧲", "🐲", "🦅", "🌞", "🪐", "🧪", "🎭", "🤖", "🌿", "🧊", "🔥", "💎", "🐝", "🧑"];
+    <dialog id="playerSetupDialog" class="modal-dialog">
+      <form id="playerSetupForm" class="dialog-content">
+        <h2>Create Your Character</h2>
+        <label>
+          Name
+          <input id="playerName" type="text" maxlength="40" required />
+        </label>
+        <label>
+          Gender
+          <select id="playerGender" required>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+        </label>
+        <label>
+          Age
+          <input id="playerAge" type="number" min="1" value="18" required />
+        </label>
+        <label>
+          Sexuality
+          <select id="playerSexuality" required>
+            <option value="straight">Straight</option>
+            <option value="bisexual">Bisexual</option>
+            <option value="gay">Gay</option>
+            <option value="lesbian">Lesbian</option>
+          </select>
+        </label>
+        <button type="submit" class="primary">Start Game</button>
+      </form>
+    </dialog>
+    <dialog id="inventoryDialog" class="modal-dialog">
+      <section class="dialog-content">
+        <h2>Your Inventory</h2>
+        <p id="equipmentSummary" class="equipment-summary"></p>
+        <div id="inventoryList" class="object-list"></div>
+        <div class="dialog-actions"><button type="button" class="ghost small" data-close-dialog="inventoryDialog">Close</button></div>
+      </section>
+    </dialog>
 
+    <script>
       const state = {
         round: 1,
+        day: 1,
         entities: [],
         objects: [],
-        inventory: [],
         currentIndex: 0,
         log: [],
         relationships: {},
         pendingCreationActorId: null,
-        pendingCreationType: null
+        pendingCreationType: null,
+        pickpocket: null,
+        relationshipEvent: null,
+        deferredTurnActorId: null,
+        pendingProposal: null,
+        affairTargetId: null,
+        turnCounter: 0
       };
 
       let aiTurnTimer = null;
+      let pickpocketClock = null;
+      let pickpocketSliderTimer = null;
 
       const elements = {
         createForm: document.getElementById("createForm"),
@@ -599,12 +755,17 @@
         chooseObject: document.getElementById("chooseObject"),
         beingName: document.getElementById("beingName"),
         beingType: document.getElementById("beingType"),
+        beingGender: document.getElementById("beingGender"),
+        beingSexuality: document.getElementById("beingSexuality"),
+        beingHumanForm: document.getElementById("beingHumanForm"),
+        humanFormLabel: document.getElementById("humanFormLabel"),
         beingRelationship: document.getElementById("beingRelationship"),
         beingIcon: document.getElementById("beingIcon"),
         beingDescription: document.getElementById("beingDescription"),
         objectName: document.getElementById("objectName"),
         objectType: document.getElementById("objectType"),
         objectSize: document.getElementById("objectSize"),
+        objectCategory: document.getElementById("objectCategory"),
         objectInInventory: document.getElementById("objectInInventory"),
         objectIcon: document.getElementById("objectIcon"),
         objectDescription: document.getElementById("objectDescription"),
@@ -620,7 +781,32 @@
         logList: document.getElementById("logList"),
         newRoundBtn: document.getElementById("newRoundBtn"),
         clearLogBtn: document.getElementById("clearLogBtn"),
-        turnPrompt: document.getElementById("turnPrompt")
+        turnPrompt: document.getElementById("turnPrompt"),
+        pickpocketPanel: document.getElementById("pickpocketPanel"),
+        pickpocketPrompt: document.getElementById("pickpocketPrompt"),
+        pickpocketChoices: document.getElementById("pickpocketChoices"),
+        pickpocketRoll: document.getElementById("pickpocketRoll"),
+        pickpocketMiniGame: document.getElementById("pickpocketMiniGame"),
+        pickpocketGame: document.getElementById("pickpocketGame"),
+        pickpocketSlider: document.getElementById("pickpocketSlider"),
+        pickpocketTargetZone: document.getElementById("pickpocketTargetZone"),
+        startPickpocketGame: document.getElementById("startPickpocketGame"),
+        pickpocketLoot: document.getElementById("pickpocketLoot"),
+        relationshipEvent: document.getElementById("relationshipEvent"),
+        relationshipEventTitle: document.getElementById("relationshipEventTitle"),
+        relationshipEventMessage: document.getElementById("relationshipEventMessage"),
+        relationshipEventChoices: document.getElementById("relationshipEventChoices"),
+        pickpocketDialog: document.getElementById("pickpocketDialog"),
+        relationshipDialog: document.getElementById("relationshipDialog"),
+        playerSetupDialog: document.getElementById("playerSetupDialog"),
+        playerSetupForm: document.getElementById("playerSetupForm"),
+        playerName: document.getElementById("playerName"),
+        playerGender: document.getElementById("playerGender"),
+        playerAge: document.getElementById("playerAge"),
+        playerSexuality: document.getElementById("playerSexuality"),
+        inventoryDialog: document.getElementById("inventoryDialog"),
+        equipmentSummary: document.getElementById("equipmentSummary"),
+        openInventory: document.getElementById("openInventory")
       };
 
       function randomFrom(list) {
@@ -706,22 +892,282 @@
       }
 
       function relationshipKey(firstId, secondId) {
-        return [firstId, secondId].sort().join(":");
+        return `${firstId}:${secondId}`;
       }
 
       function getRapport(firstId, secondId) {
-        return state.relationships[relationshipKey(firstId, secondId)] || 0;
+        const score = state.relationships[relationshipKey(firstId, secondId)];
+        return typeof score === "number" ? score : 0;
       }
 
       function changeRapport(firstId, secondId, amount) {
         const key = relationshipKey(firstId, secondId);
-        state.relationships[key] = Math.max(-10, Math.min(10, getRapport(firstId, secondId) + amount));
+        state.relationships[key] = Math.max(-100, Math.min(100, getRapport(firstId, secondId) + amount));
       }
 
       function rapportLabel(score) {
-        if (score >= 5) return "Friendly";
-        if (score <= -5) return "Strained";
-        return "Neutral";
+        if (score <= -70) return "Hates you";
+        if (score <= -30) return "Hates you";
+        if (score < 0) return "Dislikes you";
+        if (score <= 30) return "Likes you";
+        if (score < 70) return "Cares about you";
+        return "Deeply in love";
+      }
+
+      function isRomanceEligible(entity) {
+        const kind = entity.type.toLowerCase().replace(/[-_]/g, " ").trim();
+        if (/^(humans?|goblins?|orcs?|demons?|angels?)$/.test(kind)) return true;
+        return entity.humanForm
+          && /^(?:(?:human form )?(?:gods?|goddesses|deities)|(?:gods?|goddesses|deities) in human form)$/.test(kind);
+      }
+
+      function isAttractedTo(person, other) {
+        if (person.sexuality === "bisexual") return other.gender === "male" || other.gender === "female";
+        if (person.sexuality === "gay") return person.gender === "male" && other.gender === "male";
+        if (person.sexuality === "lesbian") return person.gender === "female" && other.gender === "female";
+        if (person.sexuality === "straight") {
+          return (person.gender === "male" && other.gender === "female")
+            || (person.gender === "female" && other.gender === "male");
+        }
+        return false;
+      }
+
+      function canFormPlayerRelationship(candidate, player) {
+        return candidate.relationshipStatus !== "not-interested"
+          && isRomanceEligible(candidate)
+          && (player.sexuality !== "gay" || candidate.sexuality === "gay")
+          && (player.sexuality !== "lesbian" || candidate.sexuality === "lesbian")
+          && isAttractedTo(player, candidate)
+          && isAttractedTo(candidate, player);
+      }
+
+      function updateSexualityOptions(genderSelect, sexualitySelect) {
+        const gender = genderSelect.value;
+        const gayOption = sexualitySelect.querySelector('option[value="gay"]');
+        const lesbianOption = sexualitySelect.querySelector('option[value="lesbian"]');
+        gayOption.disabled = gender !== "male";
+        lesbianOption.disabled = gender !== "female";
+        if (sexualitySelect.value === "gay" && gayOption.disabled) sexualitySelect.value = "straight";
+        if (sexualitySelect.value === "lesbian" && lesbianOption.disabled) sexualitySelect.value = "straight";
+      }
+
+      function itemCategory(item) {
+        if (item.category === "weapon" || item.category === "armor" || item.category === "food") return item.category;
+        const description = `${item.name} ${item.type}`;
+        if (/\b(armor|armour|shield|helmet|breastplate)\b/i.test(description)) return "armor";
+        if (/\b(weapon|knife|sword|dagger|axe|bow|spear)\b/i.test(description)) return "weapon";
+        if (/\b(food|meal|bread|fruit|berries|mushrooms?|ration|snack|meat|apple|vegetable|carrot|cheese|fish)\b/i.test(description)) return "food";
+        return "misc";
+      }
+
+      function progressRelationships() {
+        Object.keys(state.relationships).forEach((key) => {
+          const score = state.relationships[key];
+          if (score > 30 && state.day % 10 === 0) {
+            state.relationships[key] = Math.max(30, score - 1);
+          }
+        });
+
+        state.entities.forEach((entity) => {
+          if (entity.isPlayer || entity.hp <= 0) return;
+          const score = getRapport(entity.id, state.entities.find((being) => being.isPlayer)?.id || "");
+          const giftInterval = score >= 70 ? 5 : score >= 31 ? 10 : 0;
+          if (!giftInterval || state.day % giftInterval !== 0) return;
+
+          const gift = {
+            id: makeId(),
+            name: randomFrom(["Flower", "Lucky Coin", "Sweet Treat", "Small Keepsake"]),
+            type: "Gift",
+            icon: randomFrom(["🌷", "🪙", "🍬", "🎁"]),
+            description: `A gift from ${entity.name}.`,
+            size: "small"
+          };
+          state.objects.push(gift);
+          const player = state.entities.find((being) => being.isPlayer);
+          if (player) player.inventory.push(gift.id);
+          addLog(`<strong>${escapeHtml(entity.name)}</strong> brings you a ${escapeHtml(gift.name)}.`);
+        });
+
+        if (state.pendingProposal && state.pendingProposal.dueDay <= state.day) {
+          const candidate = state.entities.find((entity) => entity.id === state.pendingProposal.candidateId);
+          state.pendingProposal = null;
+          const player = state.entities.find((entity) => entity.isPlayer);
+          const currentPartner = state.entities.find((entity) => entity.id === player?.partnerId);
+          if (currentPartner && player) {
+            endRelationship(player, currentPartner);
+            addLog(`<strong>${escapeHtml(player.name)}</strong> breaks up with ${escapeHtml(currentPartner.name)} as promised.`);
+          }
+          if (candidate) offerRelationship(candidate, player, true);
+        }
+      }
+
+      function iconChoices(type, gender = "unspecified") {
+        const normalizedType = type.toLowerCase();
+        if (/\b(human|person|people)\b/.test(normalizedType)) {
+          return gender === "male" ? ["👨", "🧔", "👨‍🦱", "👨‍🦰"] : gender === "female" ? ["👩", "👩‍🦱", "👩‍🦰"] : ["👤"];
+        }
+        if (/\b(bee|insect|ant|butterfly|beetle|wasp)\b/.test(normalizedType)) return ["🐝", "🐜", "🦋", "🪲"];
+        if (/\b(wolf|fox|lion|tiger|bear|animal|dog|cat)\b/.test(normalizedType)) return ["🐺", "🦊", "🦁", "🐯", "🐻", "🐶", "🐱"];
+        if (/\b(dragon)\b/.test(normalizedType)) return ["🐉", "🐲"];
+        if (/\b(robot)\b/.test(normalizedType)) return ["🤖"];
+        if (/\b(god|goddess|deity)\b/.test(normalizedType)) return ["🌟", "⚡", "🌞", "🌙"];
+        return ["✨", "🧙", "🧿", "🎭", "🌿", "🔥", "💎"];
+      }
+
+      function updateCreatureIcon() {
+        elements.beingIcon.value = randomFrom(iconChoices(elements.beingType.value, elements.beingGender.value));
+      }
+
+      function finishRelationshipEvent() {
+        const actorId = state.deferredTurnActorId;
+        state.deferredTurnActorId = null;
+        state.relationshipEvent = null;
+        render();
+        const actor = state.entities.find((entity) => entity.id === actorId);
+        if (actor && actor.hp > 0) beginTurnCreation(actor);
+        else scheduleAiTurn();
+      }
+
+      function establishRelationship(first, second) {
+        first.partnerId = second.id;
+        second.partnerId = first.id;
+        first.relationshipStatus = "partnered";
+        second.relationshipStatus = "partnered";
+      }
+
+      function endRelationship(first, second) {
+        first.partnerId = null;
+        second.partnerId = null;
+        first.relationshipStatus = "single";
+        second.relationshipStatus = "single";
+      }
+
+      function offerRelationship(candidate, player, secondAsk = false) {
+        if (!candidate || !player || candidate.hp <= 0) return;
+        if (player.partnerId === candidate.id) return;
+        if (!canFormPlayerRelationship(candidate, player)) return;
+        const hasPartner = Boolean(player.partnerId);
+        const choices = [];
+        if (!hasPartner) {
+          if (secondAsk) {
+            choices.push({
+              label: "No, I don't want to be partners",
+              action: () => {
+                changeRapport(candidate.id, player.id, -10);
+                finishRelationshipEvent();
+              }
+            });
+            choices.push({
+              label: "Yes, but it would be an affair",
+              action: () => resolveAffairOffer(candidate, player)
+            });
+            state.relationshipEvent = {
+              title: `${candidate.name} asks you again`,
+              message: "You had 10 days to end your previous relationship. How do you respond?",
+              choices
+            };
+            render();
+            return;
+          }
+          choices.push({
+            label: `Yes, be partners with ${candidate.name}`,
+            action: () => {
+              establishRelationship(player, candidate);
+              state.relationships[relationshipKey(candidate.id, player.id)] = Math.max(90, getRapport(candidate.id, player.id));
+              state.relationships[relationshipKey(player.id, candidate.id)] = Math.max(90, getRapport(player.id, candidate.id));
+              addLog(`<strong>${escapeHtml(player.name)}</strong> and <strong>${escapeHtml(candidate.name)}</strong> become partners.`);
+              finishRelationshipEvent();
+            }
+          });
+          choices.push({
+            label: "No, not right now",
+            action: () => {
+              changeRapport(candidate.id, player.id, -10);
+              finishRelationshipEvent();
+            }
+          });
+        } else {
+          choices.push({
+            label: "Sorry, I’m already in a relationship",
+            action: () => {
+              changeRapport(candidate.id, player.id, -10);
+              addLog(`<strong>${escapeHtml(candidate.name)}</strong> is disappointed but respects your answer.`);
+              finishRelationshipEvent();
+            }
+          });
+          choices.push({
+            label: "We can be together, but it would be an affair",
+            action: () => resolveAffairOffer(candidate, player)
+          });
+          if (!secondAsk) {
+            choices.push({
+              label: "Give me 10 days to break up with my partner",
+              action: () => {
+                state.pendingProposal = { candidateId: candidate.id, dueDay: state.day + 10 };
+                addLog(`<strong>${escapeHtml(player.name)}</strong> asks ${escapeHtml(candidate.name)} to wait 10 days.`);
+                finishRelationshipEvent();
+              }
+            });
+          }
+        }
+
+        state.relationshipEvent = {
+          title: `${candidate.name} asks to be your ${candidate.gender === "male" ? "boyfriend" : candidate.gender === "female" ? "girlfriend" : "partner"}`,
+          message: hasPartner ? "How do you respond?" : "They are deeply in love with you. How do you respond?",
+          choices
+        };
+        render();
+      }
+
+      function resolveAffairOffer(candidate, player) {
+        const roll = rollD20();
+        if (roll <= 5) {
+          const partner = state.entities.find((entity) => entity.id === player.partnerId);
+          addLog(`<strong>${escapeHtml(candidate.name)}</strong> refuses the affair offer (d20: ${roll}) and tells your partner.`);
+          if (partner) {
+            state.relationshipEvent = {
+              title: `${partner.name} confronts you`,
+              message: `${candidate.name} told your partner about the affair offer. What do you say?`,
+              choices: [
+                {
+                  label: "Deny it",
+                  action: () => {
+                    const denialRoll = rollD20();
+                    if (denialRoll <= 5) {
+                      state.relationships[relationshipKey(partner.id, player.id)] = -68;
+                      endRelationship(player, partner);
+                      addLog(`${escapeHtml(partner.name)} does not believe you (d20: ${denialRoll}) and breaks up with you. Your relationship is now -68.`);
+                    } else if (denialRoll <= 15) {
+                      addLog(`${escapeHtml(partner.name)} believes you (d20: ${denialRoll}) and stays with you.`);
+                    } else {
+                      setHostile(partner, candidate);
+                      addLog(`${escapeHtml(partner.name)} believes you and becomes hostile toward ${escapeHtml(candidate.name)} for spreading the story.`);
+                    }
+                    finishRelationshipEvent();
+                  }
+                },
+                {
+                  label: "Admit it and break up",
+                  action: () => {
+                    endRelationship(player, partner);
+                    addLog(`<strong>${escapeHtml(player.name)}</strong> admits the affair offer and breaks up with ${escapeHtml(partner.name)}.`);
+                    finishRelationshipEvent();
+                  }
+                }
+              ]
+            };
+            render();
+          } else {
+            finishRelationshipEvent();
+          }
+        } else if (roll <= 15) {
+          addLog(`<strong>${escapeHtml(candidate.name)}</strong> accepts the affair (d20: ${roll}).`);
+          finishRelationshipEvent();
+        } else {
+          setHostile(candidate, player);
+          addLog(`<strong>${escapeHtml(candidate.name)}</strong> is offended by the affair offer (d20: ${roll}) and becomes hostile toward you.`);
+          finishRelationshipEvent();
+        }
       }
 
       function advanceTurn() {
@@ -749,11 +1195,14 @@
 
           if (!found) {
             state.round += 1;
+            state.day += 1;
+            state.turnCounter += 1;
             state.entities.forEach((entity) => {
               entity.turnUsed = false;
             });
             state.currentIndex = 0;
-            addLog(`A new round begins. Round ${state.round} has started.`);
+            progressRelationships();
+            addLog(`Day ${state.day} begins.`);
           }
 
           const activeEntity = state.entities[state.currentIndex];
@@ -801,7 +1250,7 @@
 
         if (!state.entities.length) {
           elements.turnOrder.innerHTML = '<div class="empty-state">No beings yet. Create one to start the story.</div>';
-          elements.roundBadge.textContent = `Round ${state.round}`;
+          elements.roundBadge.textContent = `Day ${state.day}`;
           return;
         }
 
@@ -845,7 +1294,7 @@
           elements.turnOrder.appendChild(item);
         });
 
-        elements.roundBadge.textContent = `Round ${state.round}`;
+        elements.roundBadge.textContent = `Day ${state.day}`;
       }
 
       function renderEntityList() {
@@ -902,7 +1351,7 @@
 
           const roundBadge = document.createElement("span");
           roundBadge.className = "mini-badge";
-          roundBadge.textContent = `Round ${state.round}`;
+          roundBadge.textContent = `Day ${state.day}`;
 
           badges.appendChild(statusBadge);
           badges.appendChild(roundBadge);
@@ -918,8 +1367,20 @@
           hitPointsBadge.className = "mini-badge";
           hitPointsBadge.textContent = `${entity.hp}/${entity.maxHp} HP`;
           badges.appendChild(hitPointsBadge);
+          if (entity.age) {
+            const ageBadge = document.createElement("span");
+            ageBadge.className = "mini-badge";
+            ageBadge.textContent = `${entity.age} years old · ${entity.gender} · ${entity.sexuality}`;
+            badges.appendChild(ageBadge);
+          }
 
           if (!entity.isPlayer) {
+            if (entity.humanForm) {
+              const formBadge = document.createElement("span");
+              formBadge.className = "mini-badge";
+              formBadge.textContent = "Human form";
+              badges.appendChild(formBadge);
+            }
             const relationshipBadge = document.createElement("span");
             relationshipBadge.className = "mini-badge";
             relationshipBadge.textContent = entity.relationshipStatus === "partnered"
@@ -930,14 +1391,32 @@
                   ? "Single"
                   : "Relationship unknown";
             badges.appendChild(relationshipBadge);
+            const identityBadge = document.createElement("span");
+            identityBadge.className = "mini-badge";
+            identityBadge.textContent = `${entity.gender} · ${entity.sexuality}`;
+            badges.appendChild(identityBadge);
 
-            const player = state.entities.find((being) => being.isPlayer);
-            if (player) {
-              const rapportBadge = document.createElement("span");
-              rapportBadge.className = "mini-badge";
-              rapportBadge.textContent = `With you: ${rapportLabel(getRapport(entity.id, player.id))}`;
-              badges.appendChild(rapportBadge);
-            }
+          }
+          state.entities.filter((being) => being.id !== entity.id).forEach((being) => {
+            const relationshipBadge = document.createElement("span");
+            relationshipBadge.className = "mini-badge";
+            const score = getRapport(entity.id, being.id);
+            relationshipBadge.textContent = `${being.name}: ${score >= 0 ? "+" : ""}${score} (${rapportLabel(score)})`;
+            badges.appendChild(relationshipBadge);
+          });
+          const equippedWeapon = state.objects.find((object) => object.id === entity.equippedWeaponId);
+          const equippedArmor = state.objects.find((object) => object.id === entity.equippedArmorId);
+          if (equippedWeapon) {
+            const weaponBadge = document.createElement("span");
+            weaponBadge.className = "mini-badge";
+            weaponBadge.textContent = `Weapon: ${equippedWeapon.name}`;
+            badges.appendChild(weaponBadge);
+          }
+          if (equippedArmor) {
+            const armorBadge = document.createElement("span");
+            armorBadge.className = "mini-badge";
+            armorBadge.textContent = `Armor: ${equippedArmor.name}`;
+            badges.appendChild(armorBadge);
           }
 
           lineup.appendChild(name);
@@ -963,7 +1442,7 @@
         });
 
         const activeEntity = state.entities[state.currentIndex];
-        const playerTurn = Boolean(activeEntity && activeEntity.isPlayer && activeEntity.hp > 0 && !activeEntity.turnUsed);
+        const playerTurn = Boolean(activeEntity && activeEntity.isPlayer && activeEntity.hp > 0 && !activeEntity.turnUsed && !state.pickpocket && !state.relationshipEvent);
         const waitingForCreation = Boolean(activeEntity && state.pendingCreationActorId === activeEntity.id);
         elements.turnPrompt.textContent = waitingForCreation
           ? "Choose a creature or object to finish your turn."
@@ -974,8 +1453,10 @@
         Array.from(elements.actionForm.elements).forEach((control) => {
           control.disabled = !playerTurn;
         });
-        elements.newRoundBtn.disabled = Boolean(state.pendingCreationActorId || state.entities.some((entity) => entity.busyTurns > 0) || (activeEntity && activeEntity.isPlayer && activeEntity.hp <= 0));
+        elements.newRoundBtn.disabled = Boolean(state.pendingCreationActorId || state.pickpocket || state.relationshipEvent || state.entities.some((entity) => entity.busyTurns > 0) || (activeEntity && activeEntity.isPlayer && activeEntity.hp <= 0));
         renderCreationPanel();
+        renderPickpocketPanel();
+        renderRelationshipEvent();
       }
 
       function renderCreationPanel() {
@@ -996,12 +1477,15 @@
 
       function renderObjectList() {
         elements.objectList.innerHTML = "";
-        if (!state.objects.length) {
-          elements.objectList.innerHTML = '<div class="empty-state">No objects created yet.</div>';
+        const groundObjects = state.objects.filter((object) =>
+          !state.entities.some((entity) => entity.inventory.includes(object.id))
+        );
+        if (!groundObjects.length) {
+          elements.objectList.innerHTML = '<div class="empty-state">No objects outside inventories yet.</div>';
           return;
         }
 
-        state.objects.forEach((object) => {
+        groundObjects.forEach((object) => {
           const card = document.createElement("article");
           card.className = "object-card";
           const name = document.createElement("h3");
@@ -1016,11 +1500,6 @@
             construction.className = "mini-badge";
             construction.textContent = "Large construction";
             card.appendChild(construction);
-          } else if (state.inventory.includes(object.id)) {
-            const inventoryBadge = document.createElement("span");
-            inventoryBadge.className = "mini-badge";
-            inventoryBadge.textContent = "In inventory";
-            card.appendChild(inventoryBadge);
           }
           const description = document.createElement("p");
           description.textContent = object.description || "A newly created object.";
@@ -1031,25 +1510,157 @@
 
       function renderInventory() {
         elements.inventoryList.innerHTML = "";
-        const items = state.inventory
+        const player = state.entities.find((entity) => entity.isPlayer);
+        const itemIds = player ? player.inventory : [];
+        const items = itemIds
           .map((objectId) => state.objects.find((object) => object.id === objectId))
           .filter(Boolean);
         if (!items.length) {
           elements.inventoryList.innerHTML = '<div class="empty-state">Your inventory is empty.</div>';
+          elements.equipmentSummary.textContent = "No equipment is currently equipped.";
           return;
         }
 
+        const weapon = items.find((item) => item.id === player.equippedWeaponId);
+        const armor = items.find((item) => item.id === player.equippedArmorId);
+        elements.equipmentSummary.textContent = `Weapon: ${weapon?.name || "none"} · Armor: ${armor?.name || "none"}`;
         items.forEach((object) => {
           const card = document.createElement("article");
-          card.className = "object-card";
+          card.className = "object-card inventory-item";
           const name = document.createElement("h3");
           name.textContent = `${object.icon} ${object.name}`;
           const type = document.createElement("span");
           type.className = "mini-badge";
-          type.textContent = object.type;
+          const category = itemCategory(object);
+          type.textContent = category === "food" ? "Food · consumable" : category;
           card.appendChild(name);
           card.appendChild(type);
+          const actions = document.createElement("div");
+          actions.className = "inventory-item-actions";
+          if (category === "weapon" || category === "armor") {
+            const equippedId = category === "weapon" ? player.equippedWeaponId : player.equippedArmorId;
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "secondary small";
+            button.textContent = equippedId === object.id ? "Unequip" : "Equip";
+            button.addEventListener("click", () => toggleEquipment(player, object));
+            actions.appendChild(button);
+          } else if (category === "food") {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "secondary small";
+            button.textContent = "Eat";
+            button.addEventListener("click", () => eatFood(player, object));
+            actions.appendChild(button);
+          }
+          card.appendChild(actions);
           elements.inventoryList.appendChild(card);
+        });
+      }
+
+      function toggleEquipment(entity, item) {
+        const category = itemCategory(item);
+        if (!entity.inventory.includes(item.id)) return;
+        if (category === "weapon") {
+          entity.equippedWeaponId = entity.equippedWeaponId === item.id ? null : item.id;
+        } else if (category === "armor") {
+          entity.equippedArmorId = entity.equippedArmorId === item.id ? null : item.id;
+        }
+        render();
+      }
+
+      function eatFood(player, food) {
+        if (!player.inventory.includes(food.id) || itemCategory(food) !== "food") return;
+        const roll = rollD20();
+        player.inventory = player.inventory.filter((itemId) => itemId !== food.id);
+        state.objects = state.objects.filter((item) => item.id !== food.id);
+        if (roll <= 5) {
+          const damage = Math.max(1, Math.ceil(player.maxHp * 0.1));
+          addLog(`<strong>${escapeHtml(player.name)}</strong> rolls ${roll}/20 while eating ${escapeHtml(food.name)}. It is poisoned!`);
+          applyDamage(player, damage, "is poisoned by the food", true);
+        } else {
+          const healing = Math.ceil(player.maxHp * (roll - 5) / 15);
+          const restored = Math.min(healing, player.maxHp - player.hp);
+          player.hp = Math.min(player.maxHp, player.hp + healing);
+          addLog(`<strong>${escapeHtml(player.name)}</strong> rolls ${roll}/20 while eating ${escapeHtml(food.name)} and restores ${restored} HP (${player.hp}/${player.maxHp} HP).`);
+        }
+        render();
+      }
+
+      function searchForFood(actor) {
+        const roll = rollD20();
+        actor.turnUsed = true;
+        if (roll <= 5) {
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> searches for food but finds nothing (d20: ${roll}).`, actor);
+        } else {
+          const food = {
+            id: makeId(),
+            name: randomFrom(["Wild Berries", "Foraged Mushrooms", "Trail Ration"]),
+            type: "Food",
+            icon: randomFrom(["🍓", "🍄", "🥖"]),
+            description: "Food found while searching. It may not be safe to eat.",
+            size: "small",
+            category: "food"
+          };
+          state.objects.push(food);
+          actor.inventory.push(food.id);
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> searches for food and finds ${escapeHtml(food.name)} (d20: ${roll}).`, actor);
+        }
+        elements.actionText.value = "";
+        elements.needsRoll.checked = false;
+        finishActorTurn(actor);
+      }
+
+      function renderPickpocketPanel() {
+        const theft = state.pickpocket;
+        if (!theft) {
+          if (elements.pickpocketDialog.open) elements.pickpocketDialog.close();
+          return;
+        }
+        if (!elements.pickpocketDialog.open) elements.pickpocketDialog.showModal();
+
+        const target = state.entities.find((entity) => entity.id === theft.targetId);
+        elements.pickpocketPrompt.textContent = theft.expiresAt
+          ? `Choose an item from ${target.name}'s inventory. They notice in ${Math.max(0, Math.ceil((theft.expiresAt - Date.now()) / 1000))} seconds.`
+          : theft.mode === "loot"
+            ? `Choose an item from ${target.name}'s inventory. They haven't noticed you.`
+            : `Pickpocket ${target.name}: choose a method.`;
+        elements.pickpocketChoices.hidden = theft.mode !== "choose";
+        elements.pickpocketGame.hidden = theft.mode !== "mini-game";
+        elements.pickpocketLoot.hidden = theft.mode !== "loot";
+        elements.pickpocketLoot.innerHTML = "";
+        if (theft.mode === "loot") {
+          target.inventory.forEach((objectId) => {
+            const item = state.objects.find((object) => object.id === objectId);
+            if (!item) return;
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "secondary";
+            button.textContent = `Take ${item.icon} ${item.name}`;
+            button.addEventListener("click", () => takePickpocketItem(objectId));
+            elements.pickpocketLoot.appendChild(button);
+          });
+        }
+      }
+
+      function renderRelationshipEvent() {
+        const event = state.relationshipEvent;
+        if (!event) {
+          if (elements.relationshipDialog.open) elements.relationshipDialog.close();
+          return;
+        }
+        if (!elements.relationshipDialog.open) elements.relationshipDialog.showModal();
+
+        elements.relationshipEventTitle.textContent = event.title;
+        elements.relationshipEventMessage.textContent = event.message;
+        elements.relationshipEventChoices.innerHTML = "";
+        event.choices.forEach((choice) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "secondary";
+          button.textContent = choice.label;
+          button.addEventListener("click", choice.action);
+          elements.relationshipEventChoices.appendChild(button);
         });
       }
 
@@ -1098,6 +1709,7 @@
       }
 
       async function findCreatureImage(entity) {
+        if (/\b(human|person|people)\b/i.test(entity.type)) return null;
         const search = `${entity.type} filetype:bitmap`;
         const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(search)}&gsrnamespace=6&gsrlimit=1&prop=imageinfo&iiprop=url%7Cextmetadata&iiurlwidth=256&format=json&origin=*`;
 
@@ -1122,15 +1734,23 @@
           name: entityInput.name.trim(),
           type: entityInput.type.trim(),
           relationshipStatus: entityInput.relationshipStatus || "unspecified",
+          gender: entityInput.gender || "unspecified",
+          sexuality: entityInput.sexuality || "straight",
+          age: entityInput.age || null,
+          humanForm: Boolean(entityInput.humanForm),
           description: entityInput.description.trim() || "A bold and unforgettable being.",
-          icon: entityInput.icon.trim() || "✨",
+          icon: entityInput.icon.trim() || randomFrom(iconChoices(entityInput.type, entityInput.gender)),
           hp,
           maxHp: hp,
           image: "",
           imageSource: "",
           hostileTo: [],
+          suspiciousOf: [],
           busyTurns: 0,
           construction: null,
+          inventory: [],
+          equippedWeaponId: null,
+          equippedArmorId: null,
           turnUsed,
           isPlayer: false
         };
@@ -1160,20 +1780,28 @@
         });
       }
 
-      function initializePlayer() {
+      function initializePlayer(playerDetails) {
         const player = {
           id: makeId(),
-          name: "You",
+          name: playerDetails.name,
           type: "Player",
-          description: "You are the main character. You are the only one at the start.",
-          icon: "🧑",
+          description: `${playerDetails.age}-year-old ${playerDetails.gender} ${playerDetails.sexuality} player character.`,
+          icon: playerDetails.gender === "male" ? "👨" : "👩",
+          gender: playerDetails.gender,
+          sexuality: playerDetails.sexuality,
+          age: playerDetails.age,
+          humanForm: false,
           hp: 50,
           maxHp: 50,
           image: "",
           imageSource: "",
           hostileTo: [],
+          suspiciousOf: [],
           busyTurns: 0,
           construction: null,
+          inventory: [],
+          equippedWeaponId: null,
+          equippedArmorId: null,
           turnUsed: false,
           isPlayer: true
         };
@@ -1198,12 +1826,26 @@
         }
 
         const actorId = state.pendingCreationActorId;
-        addEntity({ name, type, icon, description, relationshipStatus: elements.beingRelationship.value }, true);
+        addEntity({
+          name,
+          type,
+          icon,
+          description,
+          relationshipStatus: elements.beingRelationship.value,
+          gender: elements.beingGender.value,
+          sexuality: elements.beingSexuality.value,
+          humanForm: elements.beingHumanForm.checked
+        }, true);
 
         elements.createForm.reset();
         elements.beingType.value = "Dragon";
+        elements.beingGender.value = "unspecified";
+        elements.beingSexuality.value = "straight";
+        elements.beingHumanForm.checked = false;
+        elements.humanFormLabel.hidden = true;
         elements.beingRelationship.value = "unspecified";
-        elements.beingIcon.value = "✨";
+        updateSexualityOptions(elements.beingGender, elements.beingSexuality);
+        updateCreatureIcon();
         elements.beingDescription.value = "";
         elements.beingName.focus();
         completeTurnCreation(actorId);
@@ -1221,18 +1863,24 @@
         }
 
         const actorId = state.pendingCreationActorId;
+        if (elements.objectSize.value === "small" && /\b(food|meal|bread|fruit|berries|mushrooms?|ration|snack|meat|apple|vegetable|carrot|cheese|fish)\b/i.test(`${name} ${type}`)) {
+          addLog("Food cannot be created as an item. Spend a turn searching for food instead.");
+          render();
+          return;
+        }
         const object = {
           id: makeId(),
           name,
           type,
           icon: elements.objectIcon.value.trim() || "📦",
           description: elements.objectDescription.value.trim(),
-          size: elements.objectSize.value
+          size: elements.objectSize.value,
+          category: elements.objectCategory.value
         };
         const builder = state.entities.find((entity) => entity.id === actorId);
         if (object.size === "small") state.objects.push(object);
         if (object.size === "small" && elements.objectInInventory.checked) {
-          state.inventory.push(object.id);
+          if (builder) builder.inventory.push(object.id);
         }
         const constructionTurns = object.size === "large" ? Math.floor(Math.random() * 5) + 1 : 0;
         if (constructionTurns) {
@@ -1243,9 +1891,11 @@
         }
         addLog(object.size === "large"
           ? `<strong>${escapeHtml(name)}</strong> begins construction (${escapeHtml(type)}). It will take ${constructionTurns} turn${constructionTurns === 1 ? "" : "s"}.`
-          : `<strong>${escapeHtml(name)}</strong> is created as an object (${escapeHtml(type)}).${state.inventory.includes(object.id) ? " It is added to your inventory." : ""}`);
+          : `<strong>${escapeHtml(name)}</strong> is created as an object (${escapeHtml(type)}).${builder?.inventory.includes(object.id) ? ` It is added to ${escapeHtml(builder.name)}'s inventory.` : ""}`);
         elements.objectForm.reset();
         elements.objectSize.value = "small";
+        document.getElementById("objectCategoryLabel").hidden = false;
+        elements.objectCategory.value = "weapon";
         elements.objectInInventory.checked = false;
         elements.objectInInventory.disabled = false;
         elements.objectIcon.value = "📦";
@@ -1271,29 +1921,44 @@
 
         const createCreature = Math.random() < 0.5;
         if (createCreature) {
-          const types = ["Fox", "Dragon", "Bee", "Spirit", "Robot"];
+          const types = ["Fox", "Dragon", "Bee", "Spirit", "Robot", "Human", "Goblin", "Orc", "Demon", "Angel", "Human-form God"];
           const type = randomFrom(types);
+          const gender = randomFrom(["male", "female"]);
           addEntity({
             name: `New ${type}`,
             type,
-            icon: randomFrom(DEFAULT_ICONS),
+            icon: randomFrom(iconChoices(type, gender)),
             description: `Created by ${actor.name} at the end of their turn.`,
-            relationshipStatus: "unspecified"
+            relationshipStatus: "unspecified",
+            gender,
+            sexuality: randomFrom(["straight", "bisexual", gender === "male" ? "gay" : "lesbian"]),
+            humanForm: type === "Human-form God"
           }, true);
         } else {
           const objects = [
-            { name: "Traveling Shop", type: "Shop", icon: "🏪" },
-            { name: "Iron Knife", type: "Knife", icon: "🔪" },
-            { name: "Healing Potion", type: "Potion", icon: "🧪" },
-            { name: "Old Watchtower", type: "Building", icon: "🏰" }
+            { name: "Iron Knife", type: "Knife", icon: "🔪", size: "small", category: "weapon" },
+            { name: "Leather Armor", type: "Armor", icon: "🛡️", size: "small", category: "armor" },
+            { name: "Traveling Shop", type: "Shop", icon: "🏪", size: "large" },
+            { name: "Old Watchtower", type: "Building", icon: "🏰", size: "large" }
           ];
           const object = randomFrom(objects);
-          state.objects.push({
+          const createdObject = {
             id: makeId(),
             ...object,
             description: `Created by ${actor.name} at the end of their turn.`
-          });
-          addLog(`<strong>${escapeHtml(object.name)}</strong> is created as an object (${escapeHtml(object.type)}).`);
+          };
+          if (object.size === "small") {
+            state.objects.push(createdObject);
+            actor.inventory.push(createdObject.id);
+            if (createdObject.category === "weapon") actor.equippedWeaponId = createdObject.id;
+            if (createdObject.category === "armor") actor.equippedArmorId = createdObject.id;
+            addLog(`<strong>${escapeHtml(object.name)}</strong> is created and added to ${escapeHtml(actor.name)}'s inventory.`);
+          } else {
+            const constructionTurns = Math.floor(Math.random() * 5) + 1;
+            actor.busyTurns = constructionTurns;
+            actor.construction = createdObject;
+            addLog(`<strong>${escapeHtml(object.name)}</strong> begins construction by ${escapeHtml(actor.name)} and will take ${constructionTurns} turns.`);
+          }
         }
 
         advanceTurn();
@@ -1335,35 +2000,208 @@
         return /\b(attack|attacks|hit|hits|strike|strikes|kill|kills|fight|fights)\b/i.test(actionText);
       }
 
-      function applyDamage(target, damage, reason) {
-        target.hp = Math.max(0, target.hp - damage);
-        addLog(`<strong>${escapeHtml(target.name)}</strong> ${reason} and takes ${damage} damage (${target.hp}/${target.maxHp} HP).`, target);
+      function damageAfterArmor(target, damage, ignoreArmor = false) {
+        if (ignoreArmor || damage <= 0 || !target.inventory.includes(target.equippedArmorId)) return damage;
+        const armor = state.objects.find((item) => item.id === target.equippedArmorId);
+        if (!armor || itemCategory(armor) !== "armor") return damage;
+        return Math.max(1, Math.ceil(damage / 2));
+      }
+
+      function applyDamage(target, damage, reason, ignoreArmor = false) {
+        const actualDamage = damageAfterArmor(target, damage, ignoreArmor);
+        target.hp = Math.max(0, target.hp - actualDamage);
+        addLog(`<strong>${escapeHtml(target.name)}</strong> ${reason} and takes ${actualDamage} damage (${target.hp}/${target.maxHp} HP).`, target);
 
         if (target.hp === 0) {
           if (target.isPlayer) {
-            addLog("<strong>You have been defeated.</strong>");
+            addLog(`<strong>${escapeHtml(target.name)} has been defeated.</strong>`);
           } else {
             removeEntity(target.id, "was killed", true, false);
           }
         }
+        return actualDamage;
       }
 
       function resolveAttack(attacker, target) {
-        if (!target.hostileTo.includes(attacker.id)) target.hostileTo.push(attacker.id);
         const roll = rollD20();
+        const awarenessRoll = attacker.isPlayer ? rollD20() : null;
+        const weapon = state.objects.find((item) => item.id === attacker.equippedWeaponId
+          && attacker.inventory.includes(item.id) && itemCategory(item) === "weapon");
+        const selfHitThreshold = weapon ? 3 : 7;
+        const criticalThreshold = weapon ? 14 : 16;
 
-        if (roll <= 7) {
+        if (roll <= selfHitThreshold) {
           const damage = Math.max(1, Math.ceil(attacker.maxHp * 0.1));
-          addLog(`<strong>${escapeHtml(attacker.name)}</strong> rolls ${roll}/20 and misses ${escapeHtml(target.name)}, hurting themself instead.`);
+          addLog(`<strong>${escapeHtml(attacker.name)}</strong> rolls ${roll}/20 and misses ${escapeHtml(target.name)}, hurting themself instead.${weapon ? " The equipped weapon makes attacks risky only on 1–3." : ""}${awarenessRoll === null ? "" : ` Awareness roll: ${awarenessRoll}/20.`}`);
           applyDamage(attacker, damage, "hurts themself");
+        } else {
+          const critical = roll >= criticalThreshold;
+          const baseDamage = Math.max(1, Math.ceil(target.maxHp * 0.1));
+          const damage = baseDamage * (critical ? 3 : 1) * (weapon ? 2 : 1);
+          const actualDamage = damageAfterArmor(target, damage);
+          addLog(`<strong>${escapeHtml(attacker.name)}</strong> rolls ${roll}/20 and ${critical ? "lands a critical hit on" : "hits"} <strong>${escapeHtml(target.name)}</strong> for ${actualDamage} damage${weapon ? ` with ${escapeHtml(weapon.name)}` : ""}.${awarenessRoll === null ? "" : ` Awareness roll: ${awarenessRoll}/20.`}`);
+          applyDamage(target, damage, critical ? "is critically hit" : "is hit");
+        }
+
+        if (target.hp > 0 && awarenessRoll !== null) {
+          if (awarenessRoll <= 5) {
+            setHostile(target, attacker, -100);
+            addLog(`<strong>${escapeHtml(target.name)}</strong> recognizes ${escapeHtml(attacker.name)} and becomes aggressive!`);
+          } else if (awarenessRoll <= 15) {
+            state.relationships[relationshipKey(target.id, attacker.id)] = -40;
+            if (!target.suspiciousOf.includes(attacker.id)) target.suspiciousOf.push(attacker.id);
+            addLog(`<strong>${escapeHtml(target.name)}</strong> is suspicious of ${escapeHtml(attacker.name)} and will keep away and defend themself.`);
+          } else {
+            addLog(`<strong>${escapeHtml(target.name)}</strong> does not recognize who attacked.`);
+          }
+        }
+
+        if (target.isPlayer) {
+          state.entities
+            .filter((entity) => entity.partnerId === target.id && getRapport(entity.id, target.id) >= 70)
+            .forEach((partner) => {
+              setHostile(partner, attacker);
+              addLog(`<strong>${escapeHtml(partner.name)}</strong> sees you attacked their partner and becomes aggressive toward you.`);
+            });
+        }
+      }
+
+      function setHostile(target, aggressor, relationship = -100) {
+        if (!target.hostileTo.includes(aggressor.id)) target.hostileTo.push(aggressor.id);
+        state.relationships[relationshipKey(target.id, aggressor.id)] = relationship;
+      }
+
+      function isPickpocketAction(actionText) {
+        return /\b(pickpocket|pickpocketing|steal|stealing)\b/i.test(actionText);
+      }
+
+      function beginPickpocket(actor, target) {
+        if (!target.inventory.length) {
+          addLog(`<strong>${escapeHtml(target.name)}</strong> has nothing to pickpocket.`);
+          render();
           return;
         }
 
-        const critical = roll >= 16;
-        const baseDamage = Math.max(1, Math.ceil(target.maxHp * 0.1));
-        const damage = baseDamage * (critical ? 3 : 1);
-        addLog(`<strong>${escapeHtml(attacker.name)}</strong> rolls ${roll}/20 and ${critical ? "lands a critical hit on" : "hits"} <strong>${escapeHtml(target.name)}</strong> for ${damage} damage.`);
-        applyDamage(target, damage, critical ? "is critically hit" : "is hit");
+        state.pickpocket = { actorId: actor.id, targetId: target.id, mode: "choose", expiresAt: null };
+        render();
+      }
+
+      function choosePickpocketRoll() {
+        const theft = state.pickpocket;
+        if (!theft) return;
+        const actor = state.entities.find((entity) => entity.id === theft.actorId);
+        const target = state.entities.find((entity) => entity.id === theft.targetId);
+        if (!actor || !target) return;
+
+        const roll = rollD20();
+        if (roll <= 5) {
+          setHostile(target, actor);
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> rolls ${roll}/20 while pickpocketing. ${escapeHtml(target.name)} catches them and will hate them from now on.`);
+          finishPickpocket();
+          return;
+        }
+
+        theft.mode = "loot";
+        if (roll <= 15) {
+          theft.expiresAt = Date.now() + 30000;
+          pickpocketClock = setInterval(() => {
+            if (!state.pickpocket) return;
+            if (Date.now() >= state.pickpocket.expiresAt) {
+              state.relationships[relationshipKey(target.id, actor.id)] = -40;
+              if (!target.suspiciousOf.includes(actor.id)) target.suspiciousOf.push(actor.id);
+              addLog(`<strong>${escapeHtml(target.name)}</strong> notices the pickpocketing and becomes suspicious.`);
+              finishPickpocket();
+              return;
+            }
+            renderPickpocketPanel();
+          }, 250);
+        } else {
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> rolls ${roll}/20 while pickpocketing. ${escapeHtml(target.name)} does not notice.`);
+        }
+        render();
+      }
+
+      function startPickpocketMiniGame() {
+        const theft = state.pickpocket;
+        if (!theft) return;
+        theft.mode = "mini-game";
+        theft.sliderPosition = 0;
+        theft.sliderDirection = 1;
+        render();
+        pickpocketSliderTimer = setInterval(() => {
+          const current = state.pickpocket;
+          if (!current || current.mode !== "mini-game") return;
+          current.sliderPosition += current.sliderDirection * 1.6;
+          if (current.sliderPosition >= 99) {
+            current.sliderPosition = 99;
+            current.sliderDirection = -1;
+          } else if (current.sliderPosition <= 0) {
+            current.sliderPosition = 0;
+            current.sliderDirection = 1;
+          }
+          elements.pickpocketSlider.style.left = `${current.sliderPosition}%`;
+        }, 20);
+      }
+
+      function stopPickpocketMiniGame() {
+        if (pickpocketSliderTimer) clearInterval(pickpocketSliderTimer);
+        pickpocketSliderTimer = null;
+        const theft = state.pickpocket;
+        if (!theft || theft.mode !== "mini-game") return;
+
+        const target = state.entities.find((entity) => entity.id === theft.targetId);
+        if (!target) return finishPickpocket();
+        const inZone = theft.sliderPosition >= 47.5 && theft.sliderPosition <= 52.5;
+        if (!inZone) {
+          const actor = state.entities.find((entity) => entity.id === theft.actorId);
+          setHostile(target, actor);
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> misses the pickpocket timing and is caught by ${escapeHtml(target.name)}.`);
+          finishPickpocket();
+          return;
+        }
+
+        theft.mode = "loot";
+        theft.expiresAt = null;
+        addLog("Perfect timing: pickpocketing the item is successful without being noticed.");
+        render();
+      }
+
+      function takePickpocketItem(objectId) {
+        const theft = state.pickpocket;
+        if (!theft) return;
+        const actor = state.entities.find((entity) => entity.id === theft.actorId);
+        const target = state.entities.find((entity) => entity.id === theft.targetId);
+        if (!actor || !target || !target.inventory.includes(objectId)) return;
+        if (theft.expiresAt && Date.now() >= theft.expiresAt) {
+          state.relationships[relationshipKey(target.id, actor.id)] = -40;
+          if (!target.suspiciousOf.includes(actor.id)) target.suspiciousOf.push(actor.id);
+          addLog(`<strong>${escapeHtml(target.name)}</strong> notices the pickpocketing before the item can be taken.`);
+          finishPickpocket();
+          return;
+        }
+
+        target.inventory = target.inventory.filter((id) => id !== objectId);
+        if (target.equippedWeaponId === objectId) target.equippedWeaponId = null;
+        if (target.equippedArmorId === objectId) target.equippedArmorId = null;
+        actor.inventory.push(objectId);
+        const item = state.objects.find((object) => object.id === objectId);
+        addLog(`<strong>${escapeHtml(actor.name)}</strong> pickpockets ${escapeHtml(item.name)} from <strong>${escapeHtml(target.name)}</strong>.`);
+        finishPickpocket();
+      }
+
+      function finishPickpocket() {
+        if (pickpocketClock) clearInterval(pickpocketClock);
+        if (pickpocketSliderTimer) clearInterval(pickpocketSliderTimer);
+        pickpocketClock = null;
+        pickpocketSliderTimer = null;
+        const actor = state.entities.find((entity) => entity.id === state.pickpocket?.actorId);
+        state.pickpocket = null;
+        if (actor) {
+          actor.turnUsed = true;
+          finishActorTurn(actor);
+        } else {
+          render();
+        }
       }
 
       function socialReply(intent, accepted, actionText, target, approachRoll, approachThreshold, requestRoll, hasPartner, isNotInterested) {
@@ -1442,24 +2280,34 @@
         const requestRoll = rollD20();
         const hasPartner = target.relationshipStatus === "partnered";
         const isNotInterested = target.relationshipStatus === "not-interested";
-        const rapport = getRapport(actor.id, target.id);
-        const rapportModifier = Math.max(-3, Math.min(3, Math.trunc(rapport / 3)));
-        const approachThreshold = 10 - rapportModifier;
+        const rapport = getRapport(target.id, actor.id);
+        const approachThreshold = rapport <= -70 ? 21 : 10;
         const requestThreshold = intent.romantic && hasPartner
           ? 15
           : intent.romantic && isNotInterested
             ? 21
-            : 10 - rapportModifier;
+            : rapport >= -69 && rapport <= -30
+              ? 15
+              : 10;
         const willingToTalk = approachRoll >= approachThreshold;
         const acceptsRequest = requestRoll >= requestThreshold;
         const accepted = willingToTalk && acceptsRequest;
 
-        changeRapport(actor.id, target.id, accepted ? (intent.romantic ? 2 : 1) : -1);
+        if (accepted) {
+          changeRapport(target.id, actor.id, 10);
+        } else {
+          changeRapport(target.id, actor.id, -5);
+        }
 
         const response = socialReply(intent, accepted, actionText, target, approachRoll, approachThreshold, requestRoll, hasPartner, isNotInterested);
         const firstCheck = `<strong>Approach roll:</strong> ${approachRoll}/20 (needs ${approachThreshold}+; ${willingToTalk ? "engages" : "does not engage"}).`;
         const secondCheck = `<strong>Request roll:</strong> ${requestRoll}/20 (needs ${requestThreshold}+; ${acceptsRequest ? "passes" : "does not pass"} the request check).`;
-        addLog(`<strong>${escapeHtml(actor.name)}</strong> tries to ${escapeHtml(actionText)} with <strong>${escapeHtml(target.name)}</strong>. ${firstCheck} ${secondCheck} ${response}`, target);
+        addLog(`<strong>${escapeHtml(actor.name)}</strong> tries to ${escapeHtml(actionText)} with <strong>${escapeHtml(target.name)}</strong>. ${firstCheck} ${secondCheck} ${accepted ? "Rapport +10." : "Rapport -5."} ${response}`, target);
+        if (accepted && getRapport(target.id, actor.id) >= 90) {
+          const player = state.entities.find((entity) => entity.isPlayer);
+          if (actor.isPlayer && target !== player && canFormPlayerRelationship(target, actor)) offerRelationship(target, actor);
+          else if (target.isPlayer && actor !== player && canFormPlayerRelationship(actor, target)) offerRelationship(actor, target);
+        }
       }
 
       function resolveAction(event) {
@@ -1494,6 +2342,22 @@
         const requiresRoll = elements.needsRoll.checked;
         const target = findActionTarget(actionText);
         const intent = socialIntent(actionText);
+
+        if (/\b(search|scavenge|forage|look)\b.*\b(food|berries|mushrooms|ration)\b/i.test(actionText)) {
+          searchForFood(actor);
+          return;
+        }
+
+        if (isPickpocketAction(actionText)) {
+          if (!target) {
+            addLog("To pickpocket, type the name of a created, living creature.");
+            render();
+            return;
+          }
+          elements.actionText.value = "";
+          beginPickpocket(actor, target);
+          return;
+        }
 
         if (isAttackAction(actionText)) {
           if (!target) {
@@ -1550,6 +2414,11 @@
       }
 
       function finishActorTurn(actor) {
+        if (state.relationshipEvent) {
+          state.deferredTurnActorId = actor.id;
+          render();
+          return;
+        }
         if (actor.hp <= 0) {
           if (actor.isPlayer) {
             render();
@@ -1580,6 +2449,7 @@
 
       function scheduleAiTurn() {
         if (aiTurnTimer) clearTimeout(aiTurnTimer);
+        if (state.pickpocket || state.relationshipEvent) return;
         if (state.entities.some((entity) => entity.isPlayer && entity.hp <= 0)) return;
         const activeEntity = state.entities[state.currentIndex];
         if (activeEntity && !activeEntity.isPlayer && !activeEntity.turnUsed) {
@@ -1597,6 +2467,23 @@
           actor.turnUsed = true;
           addLog(`<strong>${escapeHtml(actor.name)}</strong> seeks revenge and attacks ${escapeHtml(hatedTarget.name)}.`);
           resolveAttack(actor, hatedTarget);
+          finishActorTurn(actor);
+          return;
+        }
+
+        const suspiciousTarget = state.entities.find((entity) => actor.suspiciousOf.includes(entity.id) && entity.hp > 0);
+        if (suspiciousTarget) {
+          actor.turnUsed = true;
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> keeps their distance from ${escapeHtml(suspiciousTarget.name)} and stays on guard.`);
+          beginTurnCreation(actor);
+          return;
+        }
+
+        const socialTarget = randomFrom(state.entities.filter((entity) => entity.id !== actor.id && entity.hp > 0));
+        if (socialTarget && Math.random() < 0.35) {
+          actor.turnUsed = true;
+          const intent = { romantic: false, handshake: false, holdingHand: false, greeting: true, compliment: false, question: false };
+          resolveSocialAction(actor, socialTarget, `says hello to ${socialTarget.name}`, intent);
           finishActorTurn(actor);
           return;
         }
@@ -1627,19 +2514,53 @@
         if (state.pendingCreationActorId || state.entities.some((entity) => entity.busyTurns > 0) || state.entities.some((entity) => entity.isPlayer && entity.hp <= 0)) return;
 
         state.round += 1;
+        state.day += 1;
+        state.turnCounter += 1;
         state.entities.forEach((entity) => {
           entity.turnUsed = false;
         });
         state.currentIndex = 0;
-        addLog("The round was reset. Everyone is ready to act again.");
+        progressRelationships();
+        addLog(`Day ${state.day} begins. Everyone is ready to act again.`);
         render();
         scheduleAiTurn();
       }
 
       function setupEvents() {
+        elements.playerSetupForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const name = elements.playerName.value.trim();
+          const age = Number(elements.playerAge.value);
+          if (!name) {
+            elements.playerName.focus();
+            return;
+          }
+          if (!Number.isInteger(age) || age < 1) {
+            elements.playerAge.focus();
+            return;
+          }
+          initializePlayer({
+            name,
+            gender: elements.playerGender.value,
+            age,
+            sexuality: elements.playerSexuality.value
+          });
+          elements.playerSetupDialog.close();
+          render();
+          scheduleAiTurn();
+        });
         elements.createForm.addEventListener("submit", createBeing);
         elements.objectForm.addEventListener("submit", createObject);
         elements.actionForm.addEventListener("submit", resolveAction);
+        elements.pickpocketRoll.addEventListener("click", choosePickpocketRoll);
+        elements.pickpocketMiniGame.addEventListener("click", startPickpocketMiniGame);
+        elements.startPickpocketGame.addEventListener("click", stopPickpocketMiniGame);
+        document.addEventListener("keydown", (event) => {
+          if (event.code === "Space" && state.pickpocket?.mode === "mini-game") {
+            event.preventDefault();
+            stopPickpocketMiniGame();
+          }
+        });
         elements.chooseCreature.addEventListener("click", () => {
           if (!state.pendingCreationActorId) return;
           state.pendingCreationType = "creature";
@@ -1650,22 +2571,52 @@
           state.pendingCreationType = "object";
           render();
         });
-        elements.randomIconBtn.addEventListener("click", () => {
-          elements.beingIcon.value = randomFrom(DEFAULT_ICONS);
+        elements.randomIconBtn.addEventListener("click", updateCreatureIcon);
+        elements.beingType.addEventListener("input", updateCreatureIcon);
+        elements.beingGender.addEventListener("change", () => {
+          updateCreatureIcon();
+          updateSexualityOptions(elements.beingGender, elements.beingSexuality);
+        });
+        elements.playerGender.addEventListener("change", () => {
+          updateSexualityOptions(elements.playerGender, elements.playerSexuality);
+        });
+        elements.beingType.addEventListener("input", () => {
+          elements.humanFormLabel.hidden = !/\b(gods?|goddesses|deities)\b/i.test(elements.beingType.value);
         });
         elements.objectSize.addEventListener("change", () => {
           elements.objectInInventory.disabled = elements.objectSize.value !== "small";
+          document.getElementById("objectCategoryLabel").hidden = elements.objectSize.value !== "small";
           if (elements.objectInInventory.disabled) elements.objectInInventory.checked = false;
         });
         const suggestObjectSize = () => {
+          const objectDetails = `${elements.objectName.value} ${elements.objectType.value}`;
           const isLargeConstruction = /\b(shop|house|building|castle|tower|fortress|mansion|temple|bridge|warehouse|barn|stable|ship|airship)\b/i
-            .test(`${elements.objectName.value} ${elements.objectType.value}`);
+            .test(objectDetails);
           elements.objectSize.value = isLargeConstruction ? "large" : "small";
+          if (/\b(armor|armour|shield|helmet|breastplate)\b/i.test(objectDetails)) {
+            elements.objectCategory.value = "armor";
+          }
+          document.getElementById("objectCategoryLabel").hidden = isLargeConstruction;
           elements.objectInInventory.disabled = isLargeConstruction;
           if (isLargeConstruction) elements.objectInInventory.checked = false;
         };
         elements.objectName.addEventListener("input", suggestObjectSize);
         elements.objectType.addEventListener("input", suggestObjectSize);
+        elements.openInventory.addEventListener("click", () => {
+          renderInventory();
+          if (!elements.inventoryDialog.open) elements.inventoryDialog.showModal();
+        });
+        document.querySelectorAll("[data-close-dialog]").forEach((button) => {
+          button.addEventListener("click", () => document.getElementById(button.dataset.closeDialog).close());
+        });
+        [elements.playerSetupDialog, elements.pickpocketDialog, elements.relationshipDialog].forEach((dialog) => {
+          dialog.addEventListener("cancel", (event) => event.preventDefault());
+        });
+        [elements.pickpocketDialog, elements.relationshipDialog].forEach((dialog) => {
+          dialog.addEventListener("click", (event) => {
+            if (event.target === dialog) event.preventDefault();
+          });
+        });
         elements.newRoundBtn.addEventListener("click", resetRound);
         elements.clearLogBtn.addEventListener("click", () => {
           state.log = [];
@@ -1674,10 +2625,12 @@
       }
 
       function initialize() {
-        initializePlayer();
         setupEvents();
+        updateSexualityOptions(elements.beingGender, elements.beingSexuality);
+        updateSexualityOptions(elements.playerGender, elements.playerSexuality);
         render();
-        scheduleAiTurn();
+        elements.playerSetupDialog.showModal();
+        elements.playerName.focus();
       }
 
       initialize();
