@@ -2302,7 +2302,7 @@
         const response = socialReply(intent, accepted, actionText, target, approachRoll, approachThreshold, requestRoll, hasPartner, isNotInterested);
         const firstCheck = `<strong>Approach roll:</strong> ${approachRoll}/20 (needs ${approachThreshold}+; ${willingToTalk ? "engages" : "does not engage"}).`;
         const secondCheck = `<strong>Request roll:</strong> ${requestRoll}/20 (needs ${requestThreshold}+; ${acceptsRequest ? "passes" : "does not pass"} the request check).`;
-        addLog(`<strong>${escapeHtml(actor.name)}</strong> tries to ${escapeHtml(actionText)} with <strong>${escapeHtml(target.name)}</strong>. ${firstCheck} ${secondCheck} ${accepted ? "Rapport +10." : "Rapport -5."} ${response}`, target);
+        addLog(`<strong>${escapeHtml(actor.name)}</strong> tries to ${escapeHtml(actionText)} with <strong>${escapeHtml(target.name)}</strong>. ${firstCheck} ${secondCheck} ${accepted ? "Relationship +10 points." : "Relationship -5 points."} ${response}`, target);
         if (accepted && getRapport(target.id, actor.id) >= 90) {
           const player = state.entities.find((entity) => entity.isPlayer);
           if (actor.isPlayer && target !== player && canFormPlayerRelationship(target, actor)) offerRelationship(target, actor);
@@ -2482,7 +2482,43 @@
         const socialTarget = randomFrom(state.entities.filter((entity) => entity.id !== actor.id && entity.hp > 0));
         if (socialTarget && Math.random() < 0.35) {
           actor.turnUsed = true;
-          const intent = { romantic: false, handshake: false, holdingHand: false, greeting: true, compliment: false, question: false };
+          if (socialTarget.isPlayer) {
+            const player = socialTarget;
+            state.deferredTurnActorId = actor.id;
+            state.relationshipEvent = {
+              title: `${actor.name} wants to talk`,
+              message: `${actor.name} says hello and would like to talk. Do you want to talk with them?`,
+              choices: [
+                {
+                  label: `Talk to ${actor.name}`,
+                  action: () => {
+                    state.relationshipEvent = null;
+                    changeRapport(player.id, actor.id, 10);
+                    addLog(`<strong>${escapeHtml(player.name)}</strong> agrees to talk with <strong>${escapeHtml(actor.name)}</strong>. The conversation goes well; Relationship +10 points.`);
+                    const playerRapport = getRapport(player.id, actor.id);
+                    if (playerRapport >= 90 && canFormPlayerRelationship(actor, player)) {
+                      state.deferredTurnActorId = actor.id;
+                      offerRelationship(actor, player);
+                      return;
+                    }
+                    state.deferredTurnActorId = null;
+                    render();
+                    beginTurnCreation(actor);
+                  }
+                },
+                {
+                  label: "No, I don't want to talk",
+                  action: () => {
+                    changeRapport(player.id, actor.id, -5);
+                    addLog(`<strong>${escapeHtml(player.name)}</strong> declines to talk with <strong>${escapeHtml(actor.name)}</strong>.`);
+                    finishRelationshipEvent();
+                  }
+                }
+              ]
+            };
+            render();
+            return;
+          }
           resolveSocialAction(actor, socialTarget, `says hello to ${socialTarget.name}`, intent);
           finishActorTurn(actor);
           return;
