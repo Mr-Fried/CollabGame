@@ -317,7 +317,7 @@
       .entity-meta {
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 8px;
       }
 
       .entity-topline {
@@ -327,11 +327,74 @@
         gap: 8px;
       }
 
+      .entity-card-actions {
+        display: flex;
+        flex: 0 0 auto;
+        gap: 6px;
+      }
+
       .entity-name {
         margin: 0;
         font-size: 1.05rem;
         font-weight: 800;
       }
+
+      .entity-stats-toggle {
+        display: inline-flex;
+        flex: 0 0 auto;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        color: var(--muted);
+        background: rgba(148, 163, 184, 0.1);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+      }
+
+      .entity-stats-toggle:hover,
+      .entity-stats-toggle[aria-expanded="true"] {
+        color: var(--text);
+        background: rgba(34, 193, 255, 0.15);
+        border-color: rgba(34, 193, 255, 0.45);
+      }
+
+      .entity-stats-toggle svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      .entity-health {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .entity-health-value {
+        flex: 0 0 auto;
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 700;
+      }
+
+      .entity-health-track {
+        flex: 1;
+        height: 9px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.2);
+      }
+
+      .entity-health-fill {
+        height: 100%;
+        border-radius: inherit;
+        background: var(--good);
+        transition: width 0.25s ease, background-color 0.25s ease;
+      }
+
+      .entity-health-fill.low { background: var(--warning); }
+      .entity-health-fill.critical { background: var(--bad); }
 
       .entity-kind {
         padding: 5px 9px;
@@ -353,6 +416,179 @@
         display: flex;
         gap: 8px;
         flex-wrap: wrap;
+      }
+
+      .entity-stats {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px 12px;
+        margin: 0;
+        padding: 10px 12px;
+        background: rgba(15, 23, 42, 0.45);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+
+      .entity-stats[hidden] { display: none; }
+
+      .entity-inventory {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin: 0;
+        padding: 10px 12px;
+        background: rgba(15, 23, 42, 0.45);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+
+      .entity-inventory[hidden] { display: none; }
+
+      .entity-inventory-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.78rem;
+      }
+
+      .entity-inventory-name {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .entity-inventory-empty {
+        color: var(--muted);
+        font-size: 0.78rem;
+      }
+
+      .entity-relationships {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px 12px;
+        background: rgba(15, 23, 42, 0.45);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+
+      .entity-relationships[hidden] { display: none; }
+
+      .entity-relationships-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        padding: 8px 10px;
+        color: var(--muted);
+        background: rgba(148, 163, 184, 0.08);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        font-size: 0.76rem;
+        text-align: left;
+      }
+
+      .entity-relationships-toggle:hover,
+      .entity-relationships-toggle[aria-expanded="true"] {
+        color: var(--text);
+        background: rgba(34, 193, 255, 0.1);
+      }
+
+      .entity-relationships-toggle svg {
+        width: 16px;
+        height: 16px;
+        transition: transform 0.2s ease;
+      }
+
+      .entity-relationships-toggle[aria-expanded="true"] svg {
+        transform: rotate(180deg);
+      }
+
+      .entity-relationship-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .entity-relationship-list[hidden] { display: none; }
+
+      .entity-relationship {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .entity-relationship-label {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 0.72rem;
+      }
+
+      .entity-relationship-label span:first-child {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .entity-relationship-score {
+        flex: 0 0 auto;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .entity-relationship-track {
+        position: relative;
+        height: 10px;
+        overflow: hidden;
+        background: rgba(148, 163, 184, 0.14);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+      }
+
+      .entity-relationship-fill {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 0;
+        transition: width 0.25s ease;
+      }
+
+      .entity-relationship-fill.negative {
+        right: 50%;
+        background: #ef5361;
+      }
+
+      .entity-relationship-fill.positive {
+        left: 50%;
+        background: #42ce83;
+      }
+
+      .entity-relationship-zero {
+        position: absolute;
+        z-index: 1;
+        top: -1px;
+        bottom: -1px;
+        left: calc(50% - 1px);
+        width: 2px;
+        background: #fff;
+        box-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+      }
+
+      .entity-stat {
+        min-width: 0;
+      }
+
+      .entity-stat dt {
+        color: var(--muted);
+        font-size: 0.68rem;
+      }
+
+      .entity-stat dd {
+        margin: 2px 0 0;
+        font-size: 0.78rem;
+        overflow-wrap: anywhere;
       }
 
       .mini-badge {
@@ -1324,9 +1560,119 @@
           name.className = "entity-name";
           name.textContent = entity.name;
 
+          const cardActions = document.createElement("div");
+          cardActions.className = "entity-card-actions";
+
+          const statsToggle = document.createElement("button");
+          statsToggle.type = "button";
+          statsToggle.className = "entity-stats-toggle";
+          statsToggle.setAttribute("aria-label", `Show ${entity.name} stats`);
+          statsToggle.setAttribute("aria-expanded", "false");
+          statsToggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V5"></path><path d="M4 19h16"></path><path d="M8 15v-4"></path><path d="M12 15V8"></path><path d="M16 15V5"></path></svg>';
+
+          const inventoryToggle = document.createElement("button");
+          inventoryToggle.type = "button";
+          inventoryToggle.className = "entity-stats-toggle";
+          inventoryToggle.setAttribute("aria-label", `Show ${entity.name}'s items`);
+          inventoryToggle.setAttribute("aria-expanded", "false");
+          inventoryToggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8h14l1 12H4L5 8Z"></path><path d="M9 8a3 3 0 0 1 6 0"></path><path d="M9 13h6"></path></svg>';
+
           const kind = document.createElement("span");
           kind.className = "entity-kind";
           kind.textContent = entity.type;
+
+          const health = document.createElement("div");
+          health.className = "entity-health";
+          const healthPercentage = entity.maxHp > 0
+            ? Math.max(0, Math.min(100, (entity.hp / entity.maxHp) * 100))
+            : 0;
+          const healthValue = document.createElement("span");
+          healthValue.className = "entity-health-value";
+          healthValue.textContent = `${entity.hp}/${entity.maxHp} HP`;
+          const healthTrack = document.createElement("div");
+          healthTrack.className = "entity-health-track";
+          healthTrack.setAttribute("role", "progressbar");
+          healthTrack.setAttribute("aria-label", `${entity.name} health`);
+          healthTrack.setAttribute("aria-valuemin", "0");
+          healthTrack.setAttribute("aria-valuemax", String(entity.maxHp));
+          healthTrack.setAttribute("aria-valuenow", String(entity.hp));
+          healthTrack.setAttribute("aria-valuetext", `${entity.hp} of ${entity.maxHp} HP`);
+          const healthFill = document.createElement("div");
+          healthFill.className = `entity-health-fill${healthPercentage <= 25 ? " critical" : healthPercentage <= 50 ? " low" : ""}`;
+          healthFill.style.width = `${healthPercentage}%`;
+          healthTrack.appendChild(healthFill);
+          health.appendChild(healthValue);
+          health.appendChild(healthTrack);
+
+          const stats = document.createElement("dl");
+          stats.className = "entity-stats";
+          stats.hidden = true;
+          const addStat = (label, value) => {
+            const item = document.createElement("div");
+            item.className = "entity-stat";
+            const term = document.createElement("dt");
+            term.textContent = label;
+            const description = document.createElement("dd");
+            description.textContent = value;
+            item.appendChild(term);
+            item.appendChild(description);
+            stats.appendChild(item);
+          };
+          if (entity.age) addStat("Age", `${entity.age} years old`);
+          const gender = entity.gender || "unspecified";
+          const sexuality = entity.sexuality || "unspecified";
+          addStat("Gender", `${gender.charAt(0).toUpperCase()}${gender.slice(1)}`);
+          addStat("Sexuality", `${sexuality.charAt(0).toUpperCase()}${sexuality.slice(1)}`);
+          if (!entity.isPlayer) {
+            const relationshipStatus = entity.relationshipStatus || "unspecified";
+            addStat("Relationship status", relationshipStatus === "partnered"
+              ? "Has a partner"
+              : relationshipStatus === "not-interested"
+                ? "Not seeking romance"
+                : relationshipStatus === "single"
+                  ? "Single"
+                  : "Not specified");
+            addStat("Human form", entity.humanForm ? "Yes" : "No");
+          }
+          statsToggle.addEventListener("click", () => {
+            stats.hidden = !stats.hidden;
+            statsToggle.setAttribute("aria-expanded", String(!stats.hidden));
+            statsToggle.setAttribute("aria-label", `${stats.hidden ? "Show" : "Hide"} ${entity.name} stats`);
+          });
+
+          const inventory = document.createElement("div");
+          inventory.className = "entity-inventory";
+          inventory.hidden = true;
+          const inventoryItems = entity.inventory
+            .map((objectId) => state.objects.find((object) => object.id === objectId))
+            .filter(Boolean);
+          if (inventoryItems.length) {
+            inventoryItems.forEach((object) => {
+              const item = document.createElement("div");
+              item.className = "entity-inventory-item";
+              const itemName = document.createElement("span");
+              itemName.className = "entity-inventory-name";
+              itemName.textContent = `${object.icon || ""} ${object.name}`;
+              const itemType = document.createElement("span");
+              itemType.className = "mini-badge";
+              const category = itemCategory(object);
+              const equipped = object.id === entity.equippedWeaponId || object.id === entity.equippedArmorId;
+              itemType.textContent = `${category}${equipped ? " · Equipped" : ""}`;
+              item.appendChild(itemName);
+              item.appendChild(itemType);
+              inventory.appendChild(item);
+            });
+          } else {
+            const empty = document.createElement("span");
+            empty.className = "entity-inventory-empty";
+            empty.textContent = "No items.";
+            inventory.appendChild(empty);
+          }
+          inventoryToggle.addEventListener("click", () => {
+            inventory.hidden = !inventory.hidden;
+            inventoryToggle.setAttribute("aria-expanded", String(!inventory.hidden));
+            inventoryToggle.setAttribute("aria-label", `${inventory.hidden ? "Show" : "Hide"} ${entity.name}'s items`);
+          });
 
           const desc = document.createElement("p");
           desc.className = "entity-description";
@@ -1353,6 +1699,7 @@
           roundBadge.className = "mini-badge";
           roundBadge.textContent = `Day ${state.day}`;
 
+          badges.appendChild(kind);
           badges.appendChild(statusBadge);
           badges.appendChild(roundBadge);
 
@@ -1363,47 +1710,56 @@
             badges.appendChild(constructionBadge);
           }
 
-          const hitPointsBadge = document.createElement("span");
-          hitPointsBadge.className = "mini-badge";
-          hitPointsBadge.textContent = `${entity.hp}/${entity.maxHp} HP`;
-          badges.appendChild(hitPointsBadge);
-          if (entity.age) {
-            const ageBadge = document.createElement("span");
-            ageBadge.className = "mini-badge";
-            ageBadge.textContent = `${entity.age} years old · ${entity.gender} · ${entity.sexuality}`;
-            badges.appendChild(ageBadge);
-          }
+          const otherEntities = state.entities.filter((being) => being.id !== entity.id);
+          let relationshipsToggle = null;
+          let relationshipList = null;
+          if (otherEntities.length) {
+            relationshipsToggle = document.createElement("button");
+            relationshipsToggle.type = "button";
+            relationshipsToggle.className = "entity-relationships-toggle";
+            relationshipsToggle.setAttribute("aria-expanded", "false");
+            relationshipsToggle.innerHTML = '<span>Relationships</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>';
 
-          if (!entity.isPlayer) {
-            if (entity.humanForm) {
-              const formBadge = document.createElement("span");
-              formBadge.className = "mini-badge";
-              formBadge.textContent = "Human form";
-              badges.appendChild(formBadge);
-            }
-            const relationshipBadge = document.createElement("span");
-            relationshipBadge.className = "mini-badge";
-            relationshipBadge.textContent = entity.relationshipStatus === "partnered"
-              ? "Has a partner"
-              : entity.relationshipStatus === "not-interested"
-                ? "Not seeking romance"
-                : entity.relationshipStatus === "single"
-                  ? "Single"
-                  : "Relationship unknown";
-            badges.appendChild(relationshipBadge);
-            const identityBadge = document.createElement("span");
-            identityBadge.className = "mini-badge";
-            identityBadge.textContent = `${entity.gender} · ${entity.sexuality}`;
-            badges.appendChild(identityBadge);
-
+            relationshipList = document.createElement("div");
+            relationshipList.className = "entity-relationship-list";
+            relationshipList.hidden = true;
+            otherEntities.forEach((being) => {
+              const score = getRapport(entity.id, being.id);
+              const row = document.createElement("div");
+              row.className = "entity-relationship";
+              const label = document.createElement("div");
+              label.className = "entity-relationship-label";
+              const nameLabel = document.createElement("span");
+              nameLabel.textContent = being.name;
+              const scoreLabel = document.createElement("span");
+              scoreLabel.className = "entity-relationship-score";
+              scoreLabel.textContent = `${score > 0 ? "+" : ""}${score}`;
+              const track = document.createElement("div");
+              track.className = "entity-relationship-track";
+              track.setAttribute("role", "progressbar");
+              track.setAttribute("aria-label", `${entity.name}'s relationship with ${being.name}`);
+              track.setAttribute("aria-valuemin", "-100");
+              track.setAttribute("aria-valuemax", "100");
+              track.setAttribute("aria-valuenow", String(score));
+              track.setAttribute("aria-valuetext", `${score > 0 ? "+" : ""}${score}: ${rapportLabel(score)}`);
+              const fill = document.createElement("div");
+              fill.className = `entity-relationship-fill ${score < 0 ? "negative" : "positive"}`;
+              fill.style.width = `${Math.abs(score) / 2}%`;
+              const zero = document.createElement("div");
+              zero.className = "entity-relationship-zero";
+              track.appendChild(fill);
+              track.appendChild(zero);
+              label.appendChild(nameLabel);
+              label.appendChild(scoreLabel);
+              row.appendChild(label);
+              row.appendChild(track);
+              relationshipList.appendChild(row);
+            });
+            relationshipsToggle.addEventListener("click", () => {
+              relationshipList.hidden = !relationshipList.hidden;
+              relationshipsToggle.setAttribute("aria-expanded", String(!relationshipList.hidden));
+            });
           }
-          state.entities.filter((being) => being.id !== entity.id).forEach((being) => {
-            const relationshipBadge = document.createElement("span");
-            relationshipBadge.className = "mini-badge";
-            const score = getRapport(entity.id, being.id);
-            relationshipBadge.textContent = `${being.name}: ${score >= 0 ? "+" : ""}${score} (${rapportLabel(score)})`;
-            badges.appendChild(relationshipBadge);
-          });
           const equippedWeapon = state.objects.find((object) => object.id === entity.equippedWeaponId);
           const equippedArmor = state.objects.find((object) => object.id === entity.equippedArmorId);
           if (equippedWeapon) {
@@ -1420,10 +1776,19 @@
           }
 
           lineup.appendChild(name);
-          lineup.appendChild(kind);
+          cardActions.appendChild(statsToggle);
+          cardActions.appendChild(inventoryToggle);
+          lineup.appendChild(cardActions);
           meta.appendChild(lineup);
-          meta.appendChild(desc);
+          meta.appendChild(health);
+          meta.appendChild(stats);
+          meta.appendChild(inventory);
+          if (relationshipsToggle && relationshipList) {
+            meta.appendChild(relationshipsToggle);
+            meta.appendChild(relationshipList);
+          }
           meta.appendChild(badges);
+          meta.appendChild(desc);
 
           if (entity.imageSource) {
             const photoLink = document.createElement("a");
@@ -1785,7 +2150,7 @@
           id: makeId(),
           name: playerDetails.name,
           type: "Player",
-          description: `${playerDetails.age}-year-old ${playerDetails.gender} ${playerDetails.sexuality} player character.`,
+          description: "Player character.",
           icon: playerDetails.gender === "male" ? "👨" : "👩",
           gender: playerDetails.gender,
           sexuality: playerDetails.sexuality,
