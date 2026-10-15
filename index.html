@@ -474,36 +474,6 @@
 
       .entity-relationships[hidden] { display: none; }
 
-      .entity-relationships-toggle {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        width: 100%;
-        padding: 8px 10px;
-        color: var(--muted);
-        background: rgba(148, 163, 184, 0.08);
-        border: 1px solid var(--line);
-        border-radius: 9px;
-        font-size: 0.76rem;
-        text-align: left;
-      }
-
-      .entity-relationships-toggle:hover,
-      .entity-relationships-toggle[aria-expanded="true"] {
-        color: var(--text);
-        background: rgba(34, 193, 255, 0.1);
-      }
-
-      .entity-relationships-toggle svg {
-        width: 16px;
-        height: 16px;
-        transition: transform 0.2s ease;
-      }
-
-      .entity-relationships-toggle[aria-expanded="true"] svg {
-        transform: rotate(180deg);
-      }
-
       .entity-relationship-list {
         display: flex;
         flex-direction: column;
@@ -1712,17 +1682,22 @@
 
           const otherEntities = state.entities.filter((being) => being.id !== entity.id);
           let relationshipsToggle = null;
+          let relationshipsPanel = null;
           let relationshipList = null;
           if (otherEntities.length) {
             relationshipsToggle = document.createElement("button");
             relationshipsToggle.type = "button";
-            relationshipsToggle.className = "entity-relationships-toggle";
+            relationshipsToggle.className = "entity-stats-toggle";
+            relationshipsToggle.setAttribute("aria-label", `Show ${entity.name}'s relationships`);
             relationshipsToggle.setAttribute("aria-expanded", "false");
-            relationshipsToggle.innerHTML = '<span>Relationships</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>';
+            relationshipsToggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><path d="M3 19v-1a6 6 0 0 1 12 0v1"></path><path d="M16 5.5a3 3 0 0 1 0 5.8"></path><path d="M18 13a5 5 0 0 1 3 4.6V19"></path></svg>';
+
+            relationshipsPanel = document.createElement("div");
+            relationshipsPanel.className = "entity-relationships";
+            relationshipsPanel.hidden = true;
 
             relationshipList = document.createElement("div");
             relationshipList.className = "entity-relationship-list";
-            relationshipList.hidden = true;
             otherEntities.forEach((being) => {
               const score = getRapport(entity.id, being.id);
               const row = document.createElement("div");
@@ -1755,9 +1730,11 @@
               row.appendChild(track);
               relationshipList.appendChild(row);
             });
+            relationshipsPanel.appendChild(relationshipList);
             relationshipsToggle.addEventListener("click", () => {
-              relationshipList.hidden = !relationshipList.hidden;
-              relationshipsToggle.setAttribute("aria-expanded", String(!relationshipList.hidden));
+              relationshipsPanel.hidden = !relationshipsPanel.hidden;
+              relationshipsToggle.setAttribute("aria-expanded", String(!relationshipsPanel.hidden));
+              relationshipsToggle.setAttribute("aria-label", `${relationshipsPanel.hidden ? "Show" : "Hide"} ${entity.name}'s relationships`);
             });
           }
           const equippedWeapon = state.objects.find((object) => object.id === entity.equippedWeaponId);
@@ -1778,15 +1755,13 @@
           lineup.appendChild(name);
           cardActions.appendChild(statsToggle);
           cardActions.appendChild(inventoryToggle);
+          if (relationshipsToggle) cardActions.appendChild(relationshipsToggle);
           lineup.appendChild(cardActions);
           meta.appendChild(lineup);
           meta.appendChild(health);
+          if (relationshipsPanel) meta.appendChild(relationshipsPanel);
           meta.appendChild(stats);
           meta.appendChild(inventory);
-          if (relationshipsToggle && relationshipList) {
-            meta.appendChild(relationshipsToggle);
-            meta.appendChild(relationshipList);
-          }
           meta.appendChild(badges);
           meta.appendChild(desc);
 
