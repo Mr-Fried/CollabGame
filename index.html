@@ -49,6 +49,34 @@
         gap: 16px;
       }
 
+      .topbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .settings-button {
+        display: grid;
+        place-items: center;
+        width: 44px;
+        height: 44px;
+        padding: 0;
+        font-size: 1.35rem;
+      }
+
+      .world-map {
+        display: block;
+        width: 100%;
+        max-height: 70vh;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #10213a;
+      }
+
+      .world-map-grid { stroke: rgba(255,255,255,0.12); stroke-width: 2; }
+      .world-map-label { fill: var(--text); font-size: 90px; font-weight: 700; paint-order: stroke; stroke: #090d1a; stroke-width: 12px; }
+      .resource-list { color: var(--muted); line-height: 1.6; }
+
       .eyebrow {
         margin: 0 0 8px;
         color: var(--accent-2);
@@ -786,6 +814,10 @@
       .trait-option span { display: grid; gap: 3px; }
       .trait-option small, .trait-selection-status { color: var(--muted); font-weight: 400; }
       .trait-selection-status { margin: 0; font-size: 0.85rem; }
+      .trait-guide { margin: 12px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+      .trait-guide summary { cursor: pointer; font-weight: 700; }
+      .trait-guide p, .trait-guide-list { color: var(--muted); font-size: 0.82rem; line-height: 1.45; }
+      .trait-guide-list { display: grid; gap: 6px; margin: 10px 0 0; padding-left: 20px; }
 
       @media (max-width: 1100px) {
         .layout {
@@ -805,7 +837,11 @@
           <p class="eyebrow">Fantasy GM Sandbox</p>
           <h1>Turnmaker Tactics</h1>
         </div>
-        <button id="newRoundBtn" class="secondary">New Round</button>
+        <div class="topbar-actions">
+          <button type="button" id="mapBtn" class="ghost settings-button" aria-label="Map" title="Map">🗺️</button>
+          <button type="button" id="settingsBtn" class="ghost settings-button" aria-label="Settings" title="Settings">⚙</button>
+          <button id="newRoundBtn" class="secondary">New Round</button>
+        </div>
       </header>
 
       <main class="layout">
@@ -816,6 +852,7 @@
             <button type="button" id="chooseCreature" class="secondary">Make a Creature</button>
             <button type="button" id="chooseObject" class="secondary">Make an Object</button>
           </div>
+          <button type="button" id="skipCreation" class="ghost" hidden>Skip creation and end turn</button>
           <form id="createForm" hidden>
             <label>
               Creature name
@@ -871,8 +908,36 @@
 
             <label>
               Description
-              <textarea id="beingDescription" rows="3" placeholder="Brave, clever, and a little dramatic..."></textarea>
+              <textarea id="beingDescription" rows="3" placeholder="Friendly, unfriendly, kind..."></textarea>
             </label>
+            <label id="beingPriorityModeLabel" hidden>
+              Creature priority
+              <select id="beingPriorityMode">
+                <option value="random">Random priority</option>
+                <option value="choose">Choose priority</option>
+              </select>
+            </label>
+            <label id="beingPriorityLabel" hidden>
+              Priority
+              <select id="beingPriority">
+                <option value="combat">Combat</option>
+                <option value="survival">Survival</option>
+                <option value="friendship">Friendship</option>
+                <option value="exploration">Exploration</option>
+                <option value="building">Building</option>
+                <option value="trading">Trading</option>
+                <option value="murdering">Murdering (serial killer)</option>
+                <option value="manipulating">Manipulating others</option>
+                <option value="charming">Charming others</option>
+                <option value="crafting">Crafting items</option>
+                <option value="selling">Selling things in shops</option>
+              </select>
+            </label>
+            <details class="trait-guide">
+              <summary>How traits and descriptions affect gameplay</summary>
+              <p>Friendly or unfriendly wording in a description affects starting relationships. Traits are generated randomly for creatures. Creature trait modifier sizes are randomized and shown in each character's trait stats.</p>
+              <ul id="creatureTraitGuideList" class="trait-guide-list"></ul>
+            </details>
 
             <button type="submit" class="primary">Create Creature and End Turn</button>
           </form>
@@ -918,6 +983,7 @@
               Description
               <textarea id="objectDescription" rows="3" placeholder="A mysterious shop that appears at dusk..."></textarea>
             </label>
+            <p id="objectRecipeInfo" class="equipment-summary" aria-live="polite"></p>
 
             <button type="submit" class="primary">Create Object and End Turn</button>
           </form>
@@ -942,10 +1008,7 @@
                 <input id="actionText" type="text" placeholder="Explore the ruins, or attack the shadow beast..." required />
               </label>
 
-              <label class="checkbox-row">
-                <input id="needsRoll" type="checkbox" />
-                <span>Roll a d20 for this action (attacks always roll: 1–7 self-damage, 8–15 hit, 16–20 critical)</span>
-              </label>
+              <p>Every action requires a d20 roll.</p>
 
               <div id="diceTray" class="dice-tray" aria-live="polite">
                 <p class="dice-result-status">Ready to roll</p>
@@ -1026,9 +1089,18 @@
             <option value="lesbian">Lesbian</option>
           </select>
         </label>
-        <p>Choose up to three traits. A counter trait will be assigned when you start.</p>
+        <label>
+          Description
+          <textarea id="playerDescription" rows="3" placeholder="Kind, friendly, unfriendly..."></textarea>
+        </label>
+        <p>Choose up to three traits. A counter trait will be assigned randomly when you start. Positive traits add 2 to their stat checks; the counter trait subtracts 2. Strong/Weak and Resilient/Fragile also change max HP by 5.</p>
         <div id="playerTraitOptions" class="trait-picker"></div>
         <p id="traitSelectionStatus" class="trait-selection-status" aria-live="polite"></p>
+        <details class="trait-guide">
+          <summary>What each trait does</summary>
+          <p>Descriptions affect starting relationships only. For your character, positive traits add 2 and the counter trait subtracts 2 from d20 checks using that stat. Traits that list HP also change your max HP.</p>
+          <ul id="playerTraitGuideList" class="trait-guide-list"></ul>
+        </details>
         <button type="submit" class="primary">Start Game</button>
       </form>
     </dialog>
@@ -1036,8 +1108,18 @@
       <section class="dialog-content">
         <h2>Your Inventory</h2>
         <p id="equipmentSummary" class="equipment-summary"></p>
+        <h3>Resources</h3>
+        <p id="resourceList" class="resource-list"></p>
         <div id="inventoryList" class="object-list"></div>
         <div class="dialog-actions"><button type="button" class="ghost small" data-close-dialog="inventoryDialog">Close</button></div>
+      </section>
+    </dialog>
+    <dialog id="mapDialog" class="modal-dialog">
+      <section class="dialog-content">
+        <h2>World Map</h2>
+        <p>World scale: approximately 9,000 × 5,000 km. Each grid square represents 500 km.</p>
+        <svg id="worldMap" class="world-map" viewBox="0 0 9000 5000" role="img" aria-label="World map showing all creatures"></svg>
+        <div class="dialog-actions"><button type="button" class="ghost small" data-close-dialog="mapDialog">Close</button></div>
       </section>
     </dialog>
 
@@ -1057,7 +1139,9 @@
         deferredTurnActorId: null,
         pendingProposal: null,
         affairTargetId: null,
-        turnCounter: 0
+        turnCounter: 0,
+        worldWidth: 9000,
+        worldHeight: 5000
       };
 
       let aiTurnTimer = null;
@@ -1076,6 +1160,7 @@
         creationChoices: document.getElementById("creationChoices"),
         chooseCreature: document.getElementById("chooseCreature"),
         chooseObject: document.getElementById("chooseObject"),
+        skipCreation: document.getElementById("skipCreation"),
         beingName: document.getElementById("beingName"),
         beingType: document.getElementById("beingType"),
         beingGender: document.getElementById("beingGender"),
@@ -1085,6 +1170,10 @@
         beingRelationship: document.getElementById("beingRelationship"),
         beingIcon: document.getElementById("beingIcon"),
         beingDescription: document.getElementById("beingDescription"),
+        beingPriorityModeLabel: document.getElementById("beingPriorityModeLabel"),
+        beingPriorityMode: document.getElementById("beingPriorityMode"),
+        beingPriorityLabel: document.getElementById("beingPriorityLabel"),
+        beingPriority: document.getElementById("beingPriority"),
         objectName: document.getElementById("objectName"),
         objectType: document.getElementById("objectType"),
         objectSize: document.getElementById("objectSize"),
@@ -1092,10 +1181,10 @@
         objectInInventory: document.getElementById("objectInInventory"),
         objectIcon: document.getElementById("objectIcon"),
         objectDescription: document.getElementById("objectDescription"),
+        objectRecipeInfo: document.getElementById("objectRecipeInfo"),
         randomIconBtn: document.getElementById("randomIconBtn"),
         actionForm: document.getElementById("actionForm"),
         actionText: document.getElementById("actionText"),
-        needsRoll: document.getElementById("needsRoll"),
         diceTray: document.getElementById("diceTray"),
         entityList: document.getElementById("entityList"),
         objectList: document.getElementById("objectList"),
@@ -1126,18 +1215,64 @@
         playerSetupForm: document.getElementById("playerSetupForm"),
         playerTraitOptions: document.getElementById("playerTraitOptions"),
         traitSelectionStatus: document.getElementById("traitSelectionStatus"),
+        playerTraitGuideList: document.getElementById("playerTraitGuideList"),
+        creatureTraitGuideList: document.getElementById("creatureTraitGuideList"),
+        playerDescription: document.getElementById("playerDescription"),
         playerName: document.getElementById("playerName"),
         playerGender: document.getElementById("playerGender"),
         playerAge: document.getElementById("playerAge"),
         playerSexuality: document.getElementById("playerSexuality"),
         inventoryDialog: document.getElementById("inventoryDialog"),
         equipmentSummary: document.getElementById("equipmentSummary"),
-        openInventory: document.getElementById("openInventory")
+        resourceList: document.getElementById("resourceList"),
+        openInventory: document.getElementById("openInventory"),
+        mapBtn: document.getElementById("mapBtn"),
+        mapDialog: document.getElementById("mapDialog"),
+        worldMap: document.getElementById("worldMap")
       };
 
       function randomFrom(list) {
         return list[Math.floor(Math.random() * list.length)];
       }
+
+      const resourceNames = {
+        stick: "Sticks",
+        wood: "Wood",
+        stone: "Stone",
+        metal: "Metal ore",
+        "scrap metal": "Scrap metal",
+        sand: "Sand",
+        leather: "Leather",
+        gunpowder: "Gunpowder",
+        bullets: "Bullets"
+      };
+      const resourceSearchOptions = ["stick", "wood", "stone", "metal", "sand"];
+      const itemRecipes = [
+        { match: /\b(wooden knife|wood knife)\b/i, name: "Wooden Knife", category: "weapon", costs: { stick: 1 }, durability: 20 },
+        { match: /\b(stone knife)\b/i, name: "Stone Knife", category: "weapon", costs: { stone: 1 }, durability: 35 },
+        { match: /\b(iron knife|metal knife)\b/i, name: "Iron Knife", category: "weapon", costs: { "scrap metal": 1 }, durability: 60 },
+        { match: /\b(gun|pistol|rifle)\b/i, name: "Gun", category: "weapon", costs: { "scrap metal": 1, metal: 1, gunpowder: 1 }, durability: 50 },
+        { match: /\b(leather armor|leather armour)\b/i, name: "Leather Armor", category: "armor", costs: { leather: 2 }, durability: 40 },
+        { match: /\b(iron armor|metal armor|iron armour|metal armour)\b/i, name: "Iron Armor", category: "armor", costs: { "scrap metal": 3 }, durability: 70 },
+        { match: /\b(wooden shield|wood shield)\b/i, name: "Wooden Shield", category: "armor", costs: { stick: 2 }, durability: 30 },
+        { match: /\b(shop|store|market)\b/i, name: "Shop", category: null, costs: { wood: 10, stone: 5 } },
+        { match: /\b(house|home|hut|building|tower|castle)\b/i, name: "House", category: null, costs: { wood: 6, stone: 4 } },
+        { match: /\b(bullets?|ammunition|ammo)\b/i, name: "Bullets", category: "ammunition", costs: { metal: 1, gunpowder: 1 }, amount: 5 }
+      ];
+      const creaturePriorities = [
+        ["combat", "Combat"],
+        ["survival", "Survival"],
+        ["friendship", "Friendship"],
+        ["exploration", "Exploration"],
+        ["building", "Building"],
+        ["trading", "Trading"],
+        ["murdering", "Murdering (serial killer)"],
+        ["manipulating", "Manipulating others"],
+        ["charming", "Charming others"],
+        ["crafting", "Crafting items"],
+        ["selling", "Selling things in shops"]
+      ];
+      const creaturePriorityLabels = Object.fromEntries(creaturePriorities);
 
       const positiveTraits = [
         { name: "Strong", stat: "strength", opposite: "Weak", hp: 5, description: "Powerful and physically capable." },
@@ -1173,6 +1308,24 @@
         ["luck", "Luck"],
         ["survival", "Survival"],
         ["wisdom", "Wisdom"]
+      ];
+      const traitStatActions = {
+        strength: "attack rolls",
+        intelligence: "planning, puzzles, learning, and strategy checks",
+        charisma: "conversation and persuasion rolls",
+        agility: "sneaking, dodging, jumping, climbing, running, and chasing checks",
+        courage: "facing fear, standing ground, and resisting intimidation checks",
+        perception: "noticing and observation checks, plus a defender's awareness roll when attacked by the player",
+        dexterity: "pickpocketing and precise-action rolls",
+        vitality: "maximum HP and enduring-harm checks",
+        presence: "intimidation and threatening checks",
+        luck: "general actions without a more specific matching stat",
+        survival: "searching, scavenging, and foraging checks",
+        wisdom: "judgment, intuition, advice, and memory checks"
+      };
+      const descriptionEffectRules = [
+        { pattern: /\b(friendly|kind|gentle|compassionate|trustworthy|generous|welcoming)\b/i, disposition: 10, label: "Friendly: +10 starting relationships" },
+        { pattern: /\b(unfriendly|unkind|rude|mean|cruel|cold|hostile|selfish|arrogant|aggressive|agressive|violent|threatening|intimidating|feared)\b/i, disposition: -10, label: "Unfriendly: -10 starting relationships" }
       ];
       const creatureTraitProfiles = [
         {
@@ -1318,12 +1471,134 @@
         return traits.reduce((total, name) => total + (getTrait(name)?.hp || 0), 0);
       }
 
+      function descriptionRuleMatches(description, rule) {
+        const pattern = new RegExp(rule.pattern.source, `${rule.pattern.flags.replace(/g/g, "")}g`);
+        let match;
+        while ((match = pattern.exec(description)) !== null) {
+          const precedingText = description.slice(0, match.index);
+          if (!/\b(?:not|never|isn't|is not|doesn't|does not|no longer)\s+(?:(?:at all|very|particularly|especially|really)\s+)*$/i.test(precedingText)) {
+            return true;
+          }
+          if (match[0].length === 0) pattern.lastIndex += 1;
+        }
+        return false;
+      }
+
+      function getDescriptionEffects(description) {
+        const effects = { disposition: 0, labels: [] };
+        descriptionEffectRules.forEach((rule) => {
+          if (!descriptionRuleMatches(description, rule)) return;
+          effects.disposition += rule.disposition;
+          effects.labels.push(rule.label);
+        });
+        effects.disposition = Math.max(-10, Math.min(10, effects.disposition));
+        return effects;
+      }
+
+      function randomLocation() {
+        return {
+          x: Math.random() * state.worldWidth,
+          y: Math.random() * state.worldHeight
+        };
+      }
+
+      function distanceBetween(first, second) {
+        return Math.hypot(first.location.x - second.location.x, first.location.y - second.location.y);
+      }
+
+      function describeTravelDistance(distance) {
+        const km = Math.ceil(distance);
+        return `${km} km away · ${km} walking turns · ${Math.ceil(km / 3)} running turns · ${Math.ceil(km / 10)}–${Math.ceil(km / 5)} sprinting turns`;
+      }
+
+      function findRecipe(description) {
+        return itemRecipes.find((recipe) => recipe.match.test(description)) || null;
+      }
+
+      function formatRecipe(recipe) {
+        if (!recipe) return "No recipe found. Specify a supported item or structure.";
+        return `Recipe: ${Object.entries(recipe.costs).map(([resource, amount]) => `${amount} ${resourceNames[resource] || resource}`).join(" + ")}${recipe.amount ? ` → ${recipe.amount} ${recipe.name}` : ""}.`;
+      }
+
+      function hasResources(entity, costs) {
+        return Object.entries(costs).every(([resource, amount]) => (entity.resources?.[resource] || 0) >= amount);
+      }
+
+      function consumeResources(entity, costs) {
+        if (!hasResources(entity, costs)) return false;
+        Object.entries(costs).forEach(([resource, amount]) => {
+          entity.resources[resource] -= amount;
+          if (entity.resources[resource] <= 0) delete entity.resources[resource];
+        });
+        return true;
+      }
+
+      function addResource(entity, resource, amount = 1) {
+        entity.resources[resource] = (entity.resources[resource] || 0) + amount;
+      }
+
+      function parseHatedKinds(description) {
+        const hatedKinds = new Set();
+        const matches = description.matchAll(/\bhates\s+([^.!?;]+)/gi);
+        for (const match of matches) {
+          const targets = match[1].replace(/\ball\b/gi, "").split(/\s+and\s+|,/i);
+          targets.forEach((target) => {
+            const normalized = target.trim().toLowerCase().replace(/^(?:all\s+)?/, "");
+            if (normalized === "everyone" || normalized === "everybody") hatedKinds.add("*");
+            else if (/^[a-z][a-z -]*$/.test(normalized)) hatedKinds.add(normalized);
+          });
+        }
+        return [...hatedKinds];
+      }
+
+      function hatesEntity(hater, target) {
+        return (hater.hatedKinds || []).some((kind) => {
+          if (kind === "*") return true;
+          const singular = kind.endsWith("s") ? kind.slice(0, -1) : kind;
+          return new RegExp(`\\b${singular.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}s?\\b`, "i")
+            .test(`${target.name} ${target.type}`);
+        });
+      }
+
+      function isPassiveAnimal(entity) {
+        return /\b(cows?|sheep|lambs?|horses?|donkeys?|mules?|deer|rabbits?|hares?|chickens?|ducks?|geese|goats?)\b/i
+          .test(`${entity.name} ${entity.type}`);
+      }
+
+      function yieldsLeather(entity) {
+        return /\b(cows?|sheep|lambs?|bears?|horses?|donkeys?|mules?|goats?|pigs?|boars?|deer|buffalo|bison)\b/i
+          .test(`${entity.name} ${entity.type}`);
+      }
+
+      function getObjectDurability(item) {
+        return item.durability === undefined ? 100 : item.durability;
+      }
+
+      function traitEffectText(trait, playerBuild = false) {
+        const statName = traitStats.find(([stat]) => stat === trait.stat)?.[1] || trait.stat;
+        const hpModifier = traitHpModifier([trait.name]);
+        const hpText = hpModifier ? ` Also changes max HP by ${hpModifier > 0 ? "+" : ""}${hpModifier}.` : "";
+        const checkEffect = playerBuild
+          ? `${counterTraits.includes(trait) ? "-2" : "+2"} ${statName} checks`
+          : `${counterTraits.includes(trait) ? "reduces" : "improves"} ${statName} checks`;
+        return `${trait.description} ${checkEffect} (${traitStatActions[trait.stat]}).${hpText}`;
+      }
+
+      function renderTraitGuides() {
+        const traits = [...positiveTraits, ...counterTraits];
+        [elements.playerTraitGuideList, elements.creatureTraitGuideList].forEach((list) => {
+          list.innerHTML = traits.map((trait) =>
+            `<li><strong>${escapeHtml(trait.name)}:</strong> ${escapeHtml(traitEffectText(trait))}</li>`
+          ).join("");
+        });
+      }
+
       function renderPlayerTraitOptions() {
         const options = chooseRandomTraits(positiveTraits, 10);
-        elements.playerTraitOptions.innerHTML = options.map((trait, index) => `
+        elements.playerTraitOptions.innerHTML = options.map((trait) => `
           <label class="trait-option">
             <input type="checkbox" name="playerTrait" value="${escapeHtml(trait.name)}" />
-            <span><strong>${escapeHtml(trait.name)}</strong><small>${escapeHtml(trait.description)} +2 ${escapeHtml(trait.stat)}${trait.hp ? `, ${trait.hp > 0 ? "+" : ""}${trait.hp} HP` : ""}</small></span>
+            <span><strong>${escapeHtml(trait.name)}</strong><small>${escapeHtml(traitEffectText(trait, true))}</small></span>
           </label>
         `).join("");
         elements.playerTraitOptions.querySelectorAll('input[name="playerTrait"]').forEach((input) => {
@@ -1648,6 +1923,7 @@
               }
             });
           }
+          return true;
         }
 
         state.relationshipEvent = {
@@ -1737,6 +2013,7 @@
             state.round += 1;
             state.day += 1;
             state.turnCounter += 1;
+            wearItemsForNewDay();
             state.entities.forEach((entity) => {
               entity.turnUsed = false;
             });
@@ -1950,6 +2227,7 @@
           const sexuality = entity.sexuality || "unspecified";
           addStat("Gender", `${gender.charAt(0).toUpperCase()}${gender.slice(1)}`);
           addStat("Sexuality", `${sexuality.charAt(0).toUpperCase()}${sexuality.slice(1)}`);
+          if (entity.priority) addStat("Priority", creaturePriorityLabels[entity.priority] || entity.priority);
 
           const traitPanel = document.createElement("section");
           traitPanel.className = "entity-trait-stats";
@@ -1957,6 +2235,13 @@
           const traitHeading = document.createElement("h4");
           traitHeading.textContent = `Traits: ${(entity.traits || []).join(", ") || "None"}`;
           traitPanel.appendChild(traitHeading);
+          const descriptionEffects = entity.descriptionEffects?.labels || [];
+          if (descriptionEffects.length) {
+            const effectsSummary = document.createElement("p");
+            effectsSummary.className = "entity-description";
+            effectsSummary.textContent = `Description effects: ${descriptionEffects.join("; ")}.`;
+            traitPanel.appendChild(effectsSummary);
+          }
           const traitList = document.createElement("div");
           traitList.className = "entity-trait-list";
           traitStats.forEach(([stat, label]) => {
@@ -2003,6 +2288,10 @@
                 : relationshipStatus === "single"
                   ? "Single"
                   : "Not specified");
+            const player = state.entities.find((being) => being.isPlayer);
+            if (player && entity.location) {
+              addStat("Distance from you", describeTravelDistance(distanceBetween(player, entity)));
+            }
             addStat("Human form", entity.humanForm ? "Yes" : "No");
           }
           statsToggle.addEventListener("click", () => {
@@ -2033,7 +2322,10 @@
               itemType.className = "mini-badge";
               const category = itemCategory(object);
               const equipped = object.id === entity.equippedWeaponId || object.id === entity.equippedArmorId;
-              itemType.textContent = `${category}${equipped ? " · Equipped" : ""}`;
+              const durability = object.durability === null || object.durability === undefined
+                ? ""
+                : ` · ${getObjectDurability(object) > 0 ? `${object.durability}/${object.maxDurability} durability` : "Broken"}`;
+              itemType.textContent = `${category}${equipped ? " · Equipped" : ""}${durability}`;
               item.appendChild(itemName);
               item.appendChild(itemType);
               inventory.appendChild(item);
@@ -2221,6 +2513,7 @@
         elements.creationChoices.hidden = !playerChoosing || Boolean(state.pendingCreationType);
         elements.createForm.hidden = !playerChoosing || !choosingCreature;
         elements.objectForm.hidden = !playerChoosing || !choosingObject;
+        elements.skipCreation.hidden = !playerChoosing;
       }
 
       function renderObjectList() {
@@ -2259,6 +2552,10 @@
       function renderInventory() {
         elements.inventoryList.innerHTML = "";
         const player = state.entities.find((entity) => entity.isPlayer);
+        const resources = player ? Object.entries(player.resources || {}) : [];
+        elements.resourceList.textContent = resources.length
+          ? resources.map(([resource, amount]) => `${resourceNames[resource] || resource}: ${amount}`).join(" · ")
+          : "No resources gathered yet.";
         const itemIds = player ? player.inventory : [];
         const items = itemIds
           .map((objectId) => state.objects.find((object) => object.id === objectId))
@@ -2283,6 +2580,14 @@
           type.textContent = category === "food" ? "Food · consumable" : category;
           card.appendChild(name);
           card.appendChild(type);
+          if (object.durability !== null && object.durability !== undefined) {
+            const durability = document.createElement("span");
+            durability.className = "mini-badge";
+            durability.textContent = getObjectDurability(object) > 0
+              ? `Durability ${object.durability}/${object.maxDurability}`
+              : "Broken · repair needed";
+            card.appendChild(durability);
+          }
           const actions = document.createElement("div");
           actions.className = "inventory-item-actions";
           if (category === "weapon" || category === "armor") {
@@ -2306,9 +2611,25 @@
         });
       }
 
+      function renderMap() {
+        const gridLines = [];
+        for (let x = 0; x <= state.worldWidth; x += 500) {
+          gridLines.push(`<line class="world-map-grid" x1="${x}" y1="0" x2="${x}" y2="${state.worldHeight}"></line>`);
+        }
+        for (let y = 0; y <= state.worldHeight; y += 500) {
+          gridLines.push(`<line class="world-map-grid" x1="0" y1="${y}" x2="${state.worldWidth}" y2="${y}"></line>`);
+        }
+        const markers = state.entities.map((entity) => {
+          const x = Math.round(entity.location.x);
+          const y = Math.round(entity.location.y);
+          return `<g><title>${escapeHtml(entity.name)} — ${escapeHtml(entity.type)}</title><circle cx="${x}" cy="${y}" r="48" fill="${entity.isPlayer ? "#22c1ff" : "#8b5cf6"}" stroke="#edf3ff" stroke-width="8"></circle><text x="${x}" y="${y + 14}" text-anchor="middle" font-size="54">${escapeHtml(entity.icon || "✨")}</text><text class="world-map-label" x="${x + 60}" y="${y - 12}">${escapeHtml(entity.name)}</text></g>`;
+        }).join("");
+        elements.worldMap.innerHTML = `<rect width="${state.worldWidth}" height="${state.worldHeight}" fill="#10213a"></rect>${gridLines.join("")}${markers}`;
+      }
+
       function toggleEquipment(entity, item) {
         const category = itemCategory(item);
-        if (!entity.inventory.includes(item.id)) return;
+        if (!entity.inventory.includes(item.id) || getObjectDurability(item) <= 0) return;
         if (category === "weapon") {
           entity.equippedWeaponId = entity.equippedWeaponId === item.id ? null : item.id;
         } else if (category === "armor") {
@@ -2355,8 +2676,7 @@
           addLog(`<strong>${escapeHtml(actor.name)}</strong> searches for food and finds ${escapeHtml(food.name)} (d20: ${roll}).`, actor);
         }
         elements.actionText.value = "";
-        elements.needsRoll.checked = false;
-        finishActorTurn(actor);
+        finishActorTurn(actor, true);
       }
 
       function renderPickpocketPanel() {
@@ -2454,6 +2774,7 @@
         renderObjectList();
         renderInventory();
         renderLog();
+        if (elements.mapDialog.open) renderMap();
       }
 
       async function findCreatureImage(entity) {
@@ -2481,6 +2802,8 @@
           : getCreatureTraits(entityInput.type);
         const { traits, modifiers } = generatedTraits;
         const hp = startingHitPoints(entityInput.name, entityInput.type);
+        const description = String(entityInput.description || "").trim() || "A bold and unforgettable being.";
+        const effects = getDescriptionEffects(description);
         const maxHp = Math.max(1, hp + traitHpModifier(traits));
         const entity = {
           id: makeId(),
@@ -2489,9 +2812,14 @@
           relationshipStatus: entityInput.relationshipStatus || "unspecified",
           gender: entityInput.gender || "unspecified",
           sexuality: entityInput.sexuality || "straight",
+          priority: entityInput.priority || randomFrom(creaturePriorities)[0],
           age: entityInput.age || null,
+          location: entityInput.location || randomLocation(),
+          resources: entityInput.resources || {},
+          hatedKinds: parseHatedKinds(description),
           humanForm: Boolean(entityInput.humanForm),
-          description: entityInput.description.trim() || "A bold and unforgettable being.",
+          description,
+          descriptionEffects: effects,
           icon: entityInput.icon.trim() || randomFrom(iconChoices(entityInput.type, entityInput.gender)),
           traits,
           traitModifiers: modifiers,
@@ -2512,6 +2840,7 @@
 
         entity.image = generateAvatarData(entity);
         state.entities.push(entity);
+        registerDescriptionInteractions(entity);
 
         if (state.entities.length === 1) {
           state.currentIndex = 0;
@@ -2537,18 +2866,24 @@
 
       function initializePlayer(playerDetails) {
         const traits = [...playerDetails.traits, assignPlayerCounterTrait(playerDetails.traits)];
+        const description = String(playerDetails.description || "").trim() || "Player character.";
+        const effects = getDescriptionEffects(description);
         const hp = Math.max(1, 50 + traitHpModifier(traits));
         const player = {
           id: makeId(),
           name: playerDetails.name,
           type: "Player",
-          description: "Player character.",
+          description,
           icon: playerDetails.gender === "male" ? "👨" : "👩",
           gender: playerDetails.gender,
           sexuality: playerDetails.sexuality,
           age: playerDetails.age,
+          location: randomLocation(),
+          resources: {},
+          hatedKinds: parseHatedKinds(description),
           humanForm: false,
           traits,
+          descriptionEffects: effects,
           hp,
           maxHp: hp,
           image: "",
@@ -2566,7 +2901,32 @@
 
         player.image = generateAvatarData(player);
         state.entities.push(player);
+        registerDescriptionInteractions(player);
         state.currentIndex = 0;
+      }
+
+      function registerDescriptionInteractions(entity) {
+        state.entities.filter((other) => other.id !== entity.id).forEach((other) => {
+          if (entity.descriptionEffects?.disposition) {
+            state.relationships[relationshipKey(entity.id, other.id)] = entity.descriptionEffects.disposition;
+          }
+          if (other.descriptionEffects?.disposition) {
+            state.relationships[relationshipKey(other.id, entity.id)] = other.descriptionEffects.disposition;
+          }
+          if (hatesEntity(entity, other)) {
+            setHostile(entity, other);
+            addLog(`<strong>${escapeHtml(entity.name)}</strong> hates ${escapeHtml(other.type)}s and will attack them until they are defeated.`);
+          }
+          if (hatesEntity(other, entity)) {
+            setHostile(other, entity);
+            addLog(`<strong>${escapeHtml(other.name)}</strong> hates ${escapeHtml(entity.type)}s and will attack them until they are defeated.`);
+          }
+        });
+        if (entity.descriptionEffects?.disposition && state.entities.length > 1) {
+          const dispositionText = entity.descriptionEffects.disposition > 0 ? "friendly" : "unfriendly";
+          const score = entity.descriptionEffects.disposition > 0 ? "+10" : "-10";
+          addLog(`<strong>${escapeHtml(entity.name)}</strong>'s ${dispositionText} description sets their starting relationship with each creature to ${score}.`);
+        }
       }
 
       function createBeing(event) {
@@ -2585,11 +2945,16 @@
         }
 
         const actorId = state.pendingCreationActorId;
+        const creator = state.entities.find((entity) => entity.id === actorId);
+        const priority = creator?.isPlayer && elements.beingPriorityMode.value === "choose"
+          ? elements.beingPriority.value
+          : randomFrom(creaturePriorities)[0];
         addEntity({
           name,
           type,
           icon,
           description,
+          priority,
           relationshipStatus: elements.beingRelationship.value,
           gender: elements.beingGender.value,
           sexuality: elements.beingSexuality.value,
@@ -2608,6 +2973,8 @@
         updateSexualityOptions(elements.beingGender, elements.beingSexuality);
         updateCreatureIcon();
         elements.beingDescription.value = "";
+        elements.beingPriorityMode.value = "random";
+        elements.beingPriorityLabel.hidden = true;
         elements.beingName.focus();
         completeTurnCreation(actorId);
       }
@@ -2624,21 +2991,48 @@
         }
 
         const actorId = state.pendingCreationActorId;
+        const builder = state.entities.find((entity) => entity.id === actorId);
+        const recipe = findRecipe(`${name} ${type}`);
+        if (!recipe) {
+          elements.objectRecipeInfo.textContent = "No recipe found. Try a wooden knife, stone knife, iron knife, gun, leather armor, iron armor, wooden shield, shop, house, or bullets.";
+          return;
+        }
+        if (!builder || !hasResources(builder, recipe.costs)) {
+          elements.objectRecipeInfo.textContent = `${formatRecipe(recipe)} Gather the missing resources before crafting.`;
+          return;
+        }
         if (elements.objectSize.value === "small" && /\b(food|meal|bread|fruit|berries|mushrooms?|ration|snack|meat|apple|vegetable|carrot|cheese|fish)\b/i.test(`${name} ${type}`)) {
           addLog("Food cannot be created as an item. Spend a turn searching for food instead.");
           render();
           return;
         }
+        consumeResources(builder, recipe.costs);
+        if (recipe.category === "ammunition") {
+          addResource(builder, "bullets", recipe.amount);
+          addLog(`<strong>${escapeHtml(builder.name)}</strong> crafts ${recipe.amount} bullets.`);
+          elements.objectForm.reset();
+          elements.objectSize.value = "small";
+          document.getElementById("objectCategoryLabel").hidden = false;
+          elements.objectCategory.value = "weapon";
+          elements.objectInInventory.checked = false;
+          elements.objectInInventory.disabled = false;
+          elements.objectIcon.value = "📦";
+          elements.objectRecipeInfo.textContent = "";
+          completeTurnCreation(actorId);
+          return;
+        }
         const object = {
           id: makeId(),
-          name,
-          type,
+          name: recipe.name,
+          type: recipe.name,
           icon: elements.objectIcon.value.trim() || "📦",
           description: elements.objectDescription.value.trim(),
-          size: elements.objectSize.value,
-          category: elements.objectCategory.value
+          size: recipe.category ? "small" : "large",
+          category: recipe.category || elements.objectCategory.value,
+          durability: recipe.durability || null,
+          maxDurability: recipe.durability || null,
+          lastDurabilityDay: recipe.durability ? state.day : null
         };
-        const builder = state.entities.find((entity) => entity.id === actorId);
         if (object.size === "small") state.objects.push(object);
         if (object.size === "small" && elements.objectInInventory.checked) {
           if (builder) builder.inventory.push(object.id);
@@ -2660,7 +3054,220 @@
         elements.objectInInventory.checked = false;
         elements.objectInInventory.disabled = false;
         elements.objectIcon.value = "📦";
+        elements.objectRecipeInfo.textContent = "";
         completeTurnCreation(actorId);
+      }
+
+      function updateObjectRecipeInfo() {
+        const recipe = findRecipe(`${elements.objectName.value} ${elements.objectType.value}`);
+        elements.objectRecipeInfo.textContent = formatRecipe(recipe);
+        if (!recipe) {
+          elements.objectSize.value = "small";
+          document.getElementById("objectCategoryLabel").hidden = false;
+          elements.objectInInventory.disabled = false;
+          return;
+        }
+        const isLarge = recipe.category === null;
+        elements.objectSize.value = isLarge ? "large" : "small";
+        document.getElementById("objectCategoryLabel").hidden = isLarge || recipe.category === "ammunition";
+        elements.objectInInventory.disabled = isLarge || recipe.category === "ammunition";
+        if (recipe.category === "armor" || recipe.category === "weapon") elements.objectCategory.value = recipe.category;
+        if (elements.objectInInventory.disabled) elements.objectInInventory.checked = false;
+      }
+
+      function createCraftedItem(entity, recipe, description = "") {
+        if (recipe.category === "ammunition") {
+          addResource(entity, "bullets", recipe.amount);
+          addLog(`<strong>${escapeHtml(entity.name)}</strong> crafts ${recipe.amount} bullets.`);
+          return true;
+        }
+        const item = {
+          id: makeId(),
+          name: recipe.name,
+          type: recipe.name,
+          icon: recipe.name === "Gun" ? "🔫" : recipe.category === "weapon" ? "🔪" : "🛡️",
+          description: description || `Crafted by ${entity.name}.`,
+          size: "small",
+          category: recipe.category,
+          durability: recipe.durability,
+          maxDurability: recipe.durability,
+          lastDurabilityDay: state.day
+        };
+        state.objects.push(item);
+        entity.inventory.push(item.id);
+        if (recipe.category === "weapon" && !entity.equippedWeaponId) entity.equippedWeaponId = item.id;
+        if (recipe.category === "armor" && !entity.equippedArmorId) entity.equippedArmorId = item.id;
+        addLog(`<strong>${escapeHtml(entity.name)}</strong> crafts ${escapeHtml(item.name)} and adds it to their inventory.`);
+        return true;
+      }
+
+      function resourceForage(actionText, actor, skipCreation = true) {
+        const target = actionText.match(/\b(?:search(?:\s+for)?|look\s+for|gather|collect)\s+(?:some\s+)?(resources?|sticks?|wood|stone|iron|metal|sand|leather)\b/i);
+        const requested = target?.[1]?.toLowerCase();
+        const resource = requested === "sticks" ? "stick" : requested === "iron" ? "metal" : requested;
+        const usesStrength = !resource || /^resources?$/i.test(resource) || ["wood", "stone", "metal"].includes(resource);
+        const roll = rollD20(actor, usesStrength ? "strength" : "survival");
+        actor.turnUsed = true;
+        if (!target || /^resources?$/i.test(target[1])) {
+          if (roll < 6) {
+            addLog(`<strong>${escapeHtml(actor.name)}</strong> searches for resources but finds nothing (d20: ${roll}).`);
+          } else {
+            const options = roll >= 10
+              ? resourceSearchOptions
+              : resourceSearchOptions.filter((resource) => !["wood", "stone", "metal"].includes(resource));
+            const found = [randomFrom(options), randomFrom(options)];
+            found.forEach((resource) => addResource(actor, resource));
+            addLog(`<strong>${escapeHtml(actor.name)}</strong> finds ${found.map((resource) => resourceNames[resource]).join(" and ")} (d20: ${roll}).`);
+          }
+          finishActorTurn(actor, skipCreation);
+          return;
+        }
+
+        if (resource === "leather") {
+          addLog("Leather must be recovered from a defeated animal with a hide; searching cannot produce it.");
+        } else if ((resource === "wood" || resource === "stone" || resource === "metal") && roll < 10) {
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> needs a Strength check of 10+ to gather ${resourceNames[resource]} (d20: ${roll}).`);
+        } else if (roll < 6) {
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> searches for ${resourceNames[resource]} but finds none (d20: ${roll}).`);
+        } else {
+          addResource(actor, resource);
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> finds 1 ${resourceNames[resource]} (d20: ${roll}).`);
+        }
+        finishActorTurn(actor, skipCreation);
+      }
+
+      function isResourceAction(actionText) {
+        return /\b(search|look for|gather|collect)\b.*\b(resources?|sticks?|wood|stone|iron|metal|sand|leather)\b/i.test(actionText);
+      }
+
+      function craftAction(actionText, actor, skipCreation = true) {
+        const recipe = findRecipe(actionText);
+        if (!recipe) {
+          addLog(`No recipe found for that item. ${formatRecipe(null)}`);
+          render();
+          return false;
+        }
+        if (!hasResources(actor, recipe.costs)) {
+          addLog(`${formatRecipe(recipe)} ${actor.name} does not have enough resources.`);
+          render();
+          return false;
+        }
+        const roll = rollD20(actor, "dexterity");
+        actor.turnUsed = true;
+        if (roll < 10) {
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> fails the crafting check for ${escapeHtml(recipe.name)} (needs 10+, rolled ${roll}). The materials are not used.`);
+        } else {
+          consumeResources(actor, recipe.costs);
+          createCraftedItem(actor, recipe);
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> succeeds at crafting (${roll}/20).`);
+        }
+        finishActorTurn(actor, skipCreation);
+        return true;
+      }
+
+      function repairAction(actionText, actor) {
+        const repairQuery = actionText.replace(/\b(repair|fix)\b/i, "").trim().toLowerCase();
+        const repairTerms = repairQuery.split(/\s+/).filter((word) => word !== "my" && word !== "the");
+        if (!repairTerms.length) {
+          addLog("Name an item in your inventory to repair.");
+          render();
+          return false;
+        }
+        const item = state.objects.find((candidate) =>
+          actor.inventory.includes(candidate.id)
+          && repairTerms.every((word) => `${candidate.name} ${candidate.type}`.toLowerCase().includes(word))
+        );
+        if (!item) {
+          addLog("Name an item in your inventory to repair.");
+          render();
+          return false;
+        }
+        const recipe = findRecipe(`${item.name} ${item.type}`);
+        if (!recipe || !recipe.durability) {
+          addLog(`${item.name} cannot be repaired.`);
+          render();
+          return false;
+        }
+        const halfCosts = Object.fromEntries(Object.entries(recipe.costs).map(([resource, amount]) => [resource, Math.ceil(amount / 2)]));
+        if (!hasResources(actor, halfCosts)) {
+          addLog(`Repairing ${item.name} requires half its recipe: ${formatRecipe({ ...recipe, costs: halfCosts, amount: null })}`);
+          render();
+          return false;
+        }
+        consumeResources(actor, halfCosts);
+        const roll = rollD20(actor, "dexterity");
+        actor.turnUsed = true;
+        const repair = roll < 10 ? -5 : Math.floor((roll - 10) * 1.5) + 5;
+        item.durability = Math.max(0, Math.min(item.maxDurability, getObjectDurability(item) + repair));
+        addLog(`<strong>${escapeHtml(actor.name)}</strong> rolls ${roll}/20 repairing ${escapeHtml(item.name)} and ${repair >= 0 ? "restores " + repair : "loses " + Math.abs(repair)} durability (${item.durability}/${item.maxDurability}).`);
+        finishActorTurn(actor, true);
+        return true;
+      }
+
+      function upgradeAction(actionText, actor) {
+        const upgrade = actionText.match(/\bupgrade\s+(.+?)\s+to\s+(.+)$/i);
+        if (!upgrade) return false;
+        const item = state.objects.find((candidate) =>
+          actor.inventory.includes(candidate.id) && candidate.name.toLowerCase().includes(upgrade[1].toLowerCase())
+        );
+        const recipe = findRecipe(upgrade[2]);
+        if (!item || !recipe || !recipe.category || !hasResources(actor, recipe.costs)) {
+          addLog("To upgrade an item, name an item you own, a supported new item, and have its recipe resources.");
+          render();
+          return true;
+        }
+        const roll = rollD20(actor, "dexterity");
+        actor.turnUsed = true;
+        if (roll < 10) {
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> fails the upgrade check (needs 10+, rolled ${roll}); no resources are used.`);
+        } else {
+          consumeResources(actor, recipe.costs);
+          const oldName = item.name;
+          item.name = recipe.name;
+          item.type = recipe.name;
+          item.category = recipe.category;
+          item.maxDurability = recipe.durability;
+          item.durability = Math.min(recipe.durability, getObjectDurability(item));
+          if (item.category === "weapon") actor.equippedWeaponId = item.id;
+          if (item.category === "armor") actor.equippedArmorId = item.id;
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> upgrades ${escapeHtml(oldName)} to ${escapeHtml(item.name)} (${roll}/20).`);
+        }
+        finishActorTurn(actor, true);
+        return true;
+      }
+
+      function transformResourceAction(actionText, actor) {
+        const lower = actionText.toLowerCase();
+        let input;
+        let output;
+        let quantity = 1;
+        if (/\b(refine|convert|smelt)\b.*\bmetal\b/i.test(lower)) {
+          input = "metal";
+          output = "scrap metal";
+        } else if (/\b(make|craft|create)\b.*\b(gunpowder|fire powder)\b/i.test(lower)) {
+          input = "sand";
+          output = "gunpowder";
+          quantity = 2;
+        } else {
+          return false;
+        }
+        if ((actor.resources[input] || 0) < quantity) {
+          addLog(`${actor.name} needs ${quantity} ${resourceNames[input]} to make ${resourceNames[output]}.`);
+          render();
+          return true;
+        }
+        const roll = rollD20(actor, "dexterity");
+        actor.turnUsed = true;
+        if (roll < 10) {
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> fails to process ${resourceNames[input]} (needs 10+, rolled ${roll}).`);
+        } else {
+          actor.resources[input] -= quantity;
+          if (!actor.resources[input]) delete actor.resources[input];
+          addResource(actor, output);
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> converts ${resourceNames[input]} into ${resourceNames[output]} (${roll}/20).`);
+        }
+        finishActorTurn(actor, true);
+        return true;
       }
 
       function completeTurnCreation(actorId) {
@@ -2676,11 +3283,28 @@
         if (actor.isPlayer) {
           state.pendingCreationActorId = actor.id;
           state.pendingCreationType = null;
+          elements.beingPriorityModeLabel.hidden = false;
+          elements.beingPriorityMode.value = "random";
+          elements.beingPriorityLabel.hidden = true;
           render();
           return;
         }
 
-        const createCreature = Math.random() < 0.5;
+        const objectPriority = ["building", "trading", "crafting", "selling"].includes(actor.priority);
+        let createCreature = !objectPriority && Math.random() < 0.5;
+        let objectRecipe = null;
+        if (!createCreature) {
+          let recipes = itemRecipes.filter((recipe) => recipe.category !== "ammunition");
+          if (actor.priority === "building") recipes = recipes.filter((recipe) => recipe.category === null);
+          else if (["trading", "selling"].includes(actor.priority)) recipes = recipes.filter((recipe) => /\b(shop|store|market)\b/i.test(recipe.name));
+          else if (actor.priority === "crafting") recipes = recipes.filter((recipe) => recipe.category === "weapon" || recipe.category === "armor");
+          else recipes = recipes.filter((recipe) => recipe.category !== null);
+          objectRecipe = randomFrom(recipes.filter((recipe) => hasResources(actor, recipe.costs))) || null;
+          if (!objectRecipe) {
+            addLog(`<strong>${escapeHtml(actor.name)}</strong> does not have the resources for a creation and will create a creature instead.`);
+            createCreature = true;
+          }
+        }
         if (createCreature) {
           const types = ["Fox", "Dragon", "Bee", "Spirit", "Robot", "Human", "Goblin", "Orc", "Demon", "Angel", "Human-form God"];
           const type = randomFrom(types);
@@ -2696,29 +3320,22 @@
             humanForm: type === "Human-form God"
           }, true);
         } else {
-          const objects = [
-            { name: "Iron Knife", type: "Knife", icon: "🔪", size: "small", category: "weapon" },
-            { name: "Leather Armor", type: "Armor", icon: "🛡️", size: "small", category: "armor" },
-            { name: "Traveling Shop", type: "Shop", icon: "🏪", size: "large" },
-            { name: "Old Watchtower", type: "Building", icon: "🏰", size: "large" }
-          ];
-          const object = randomFrom(objects);
-          const createdObject = {
-            id: makeId(),
-            ...object,
-            description: `Created by ${actor.name} at the end of their turn.`
-          };
-          if (object.size === "small") {
-            state.objects.push(createdObject);
-            actor.inventory.push(createdObject.id);
-            if (createdObject.category === "weapon") actor.equippedWeaponId = createdObject.id;
-            if (createdObject.category === "armor") actor.equippedArmorId = createdObject.id;
-            addLog(`<strong>${escapeHtml(object.name)}</strong> is created and added to ${escapeHtml(actor.name)}'s inventory.`);
+          consumeResources(actor, objectRecipe.costs);
+          if (objectRecipe.category !== null) {
+            createCraftedItem(actor, objectRecipe);
           } else {
+            const createdObject = {
+              id: makeId(),
+              name: objectRecipe.name,
+              type: objectRecipe.name,
+              icon: "🏠",
+              size: "large",
+              description: `Created by ${actor.name} at the end of their turn.`
+            };
             const constructionTurns = Math.floor(Math.random() * 5) + 1;
             actor.busyTurns = constructionTurns;
             actor.construction = createdObject;
-            addLog(`<strong>${escapeHtml(object.name)}</strong> begins construction by ${escapeHtml(actor.name)} and will take ${constructionTurns} turns.`);
+            addLog(`<strong>${escapeHtml(objectRecipe.name)}</strong> begins construction by ${escapeHtml(actor.name)} and will take ${constructionTurns} turns.`);
           }
         }
 
@@ -2750,10 +3367,15 @@
 
       function actionStat(actionText) {
         if (/\b(search|scavenge|forage|food|berries|mushrooms?|ration)\b/i.test(actionText)) return "survival";
-        if (/\b(plan|solve|puzzle|learn|study|strategy|figure out)\b/i.test(actionText)) return "intelligence";
+        if (/\b(plan|build|building|solve|puzzle|learn|study|strategy|figure out)\b/i.test(actionText)) return "intelligence";
         if (/\b(sneak|dodge|jump|climb|run|chase)\b/i.test(actionText)) return "agility";
         if (/\b(notice|spot|watch|observe|look for)\b/i.test(actionText)) return "perception";
-        if (/\b(persuade|convince|negotiate|perform|entertain)\b/i.test(actionText)) return "charisma";
+        if (/\b(persuade|convince|negotiate|perform|entertain|trade|sell|influence)\b/i.test(actionText)) return "charisma";
+        if (/\b(craft|crafting)\b/i.test(actionText)) return "dexterity";
+        if (/\b(intimidate|threaten|scare|command)\b/i.test(actionText)) return "presence";
+        if (/\b(face fear|resist fear|stand your ground|keep calm|stay calm|resist intimidation)\b/i.test(actionText)) return "courage";
+        if (/\b(endure|withstand|resist poison|survive injury|tough it out)\b/i.test(actionText)) return "vitality";
+        if (/\b(judge|intuition|advise|remember|recall|reflect)\b/i.test(actionText)) return "wisdom";
         return "luck";
       }
 
@@ -2815,11 +3437,86 @@
         return /\b(attack|attacks|hit|hits|strike|strikes|kill|kills|fight|fights)\b/i.test(actionText);
       }
 
+      function findTravelTarget(actionText, actor) {
+        const words = actionText.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
+        return state.entities
+          .filter((entity) => entity.id !== actor.id && entity.hp > 0)
+          .filter((entity) => {
+            const nameWords = entity.name.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
+            return nameWords.length && nameWords.every((word) => words.includes(word));
+          })
+          .sort((first, second) => second.name.length - first.name.length)[0] || null;
+      }
+
+      function travelToTarget(actionText, actor) {
+        const target = findTravelTarget(actionText, actor);
+        if (!target) {
+          addLog("To travel, type the name of another living creature on the map.");
+          render();
+          return false;
+        }
+        const mode = /\bsprint(?:ing)?\b/i.test(actionText)
+          ? "sprinting"
+          : /\brun(?:ning)?\b/i.test(actionText)
+            ? "running"
+            : "walking";
+        const thresholds = { walking: 5, running: 7, sprinting: 10 };
+        const roll = rollD20(actor, "agility");
+        const distance = distanceBetween(actor, target);
+        const pace = mode === "walking" ? 1 : mode === "running" ? 3 : Math.floor(Math.random() * 6) + 5;
+        const verbs = { walking: "walks", running: "runs", sprinting: "sprints" };
+        actor.turnUsed = true;
+        if (roll < thresholds[mode]) {
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> fails to travel toward ${escapeHtml(target.name)} by ${mode} (needs ${thresholds[mode]}+, rolled ${roll}).`);
+        } else {
+          const traveled = Math.min(distance, pace);
+          if (distance > 0) {
+            const ratio = traveled / distance;
+            actor.location.x += (target.location.x - actor.location.x) * ratio;
+            actor.location.y += (target.location.y - actor.location.y) * ratio;
+          }
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> ${verbs[mode]} ${traveled.toFixed(1)} km toward ${escapeHtml(target.name)} (d20: ${roll}).`);
+        }
+        finishActorTurn(actor, true);
+        return true;
+      }
+
       function damageAfterArmor(target, damage, ignoreArmor = false) {
         if (ignoreArmor || damage <= 0 || !target.inventory.includes(target.equippedArmorId)) return damage;
         const armor = state.objects.find((item) => item.id === target.equippedArmorId);
-        if (!armor || itemCategory(armor) !== "armor") return damage;
+        if (!armor || itemCategory(armor) !== "armor" || getObjectDurability(armor) <= 0) return damage;
+        wearItem(target, armor);
         return Math.max(1, Math.ceil(damage / 2));
+      }
+
+      function wearItem(entity, item) {
+        if (item.durability === null || item.durability === undefined) return;
+        const wasUsable = item.durability > 0;
+        item.durability = Math.max(0, item.durability - 1);
+        if (wasUsable && item.durability === 0) {
+          if (entity.equippedWeaponId === item.id) entity.equippedWeaponId = null;
+          if (entity.equippedArmorId === item.id) entity.equippedArmorId = null;
+          addLog(`<strong>${escapeHtml(item.name)}</strong> breaks and needs repair before it can be used again.`);
+        }
+      }
+
+      function wearItemsForNewDay() {
+        [...state.objects].forEach((item) => {
+          if (item.durability === null || item.durability === undefined) return;
+          const lastDurabilityDay = item.lastDurabilityDay ?? state.day;
+          if (state.day - lastDurabilityDay < 3) return;
+          item.lastDurabilityDay = state.day;
+          const owner = state.entities.find((entity) => entity.inventory.includes(item.id));
+          if (owner) {
+            wearItem(owner, item);
+            return;
+          }
+          item.durability = Math.max(0, item.durability - 1);
+          if (item.durability === 0) {
+            state.objects = state.objects.filter((object) => object.id !== item.id);
+            addLog(`<strong>${escapeHtml(item.name)}</strong> breaks down and disappears.`);
+          }
+        });
       }
 
       function applyDamage(target, damage, reason, ignoreArmor = false) {
@@ -2838,10 +3535,19 @@
       }
 
       function resolveAttack(attacker, target) {
+        const weapon = state.objects.find((item) => item.id === attacker.equippedWeaponId
+          && attacker.inventory.includes(item.id) && itemCategory(item) === "weapon" && getObjectDurability(item) > 0);
+        const usesBullets = Boolean(weapon && /\b(gun|pistol|rifle)\b/i.test(`${weapon.name} ${weapon.type}`));
+        if (usesBullets && !(attacker.resources.bullets > 0)) {
+          addLog(`<strong>${escapeHtml(attacker.name)}</strong> cannot fire ${escapeHtml(weapon.name)} without bullets.`);
+          return false;
+        }
+        if (usesBullets) {
+          attacker.resources.bullets -= 1;
+          if (attacker.resources.bullets <= 0) delete attacker.resources.bullets;
+        }
         const roll = rollD20(attacker, "strength");
         const awarenessRoll = attacker.isPlayer ? rollD20(target, "perception") : null;
-        const weapon = state.objects.find((item) => item.id === attacker.equippedWeaponId
-          && attacker.inventory.includes(item.id) && itemCategory(item) === "weapon");
         const selfHitThreshold = weapon ? 3 : 7;
         const criticalThreshold = weapon ? 14 : 16;
 
@@ -2849,16 +3555,23 @@
           const damage = Math.max(1, Math.ceil(attacker.maxHp * 0.1));
           addLog(`<strong>${escapeHtml(attacker.name)}</strong> rolls ${roll}/20 and misses ${escapeHtml(target.name)}, hurting themself instead.${weapon ? " The equipped weapon makes attacks risky only on 1–3." : ""}${awarenessRoll === null ? "" : ` Awareness roll: ${awarenessRoll}/20.`}`);
           applyDamage(attacker, damage, "hurts themself");
+          if (weapon) wearItem(attacker, weapon);
         } else {
           const critical = roll >= criticalThreshold;
           const baseDamage = Math.max(1, Math.ceil(target.maxHp * 0.1));
           const damage = baseDamage * (critical ? 3 : 1) * (weapon ? 2 : 1);
           const actualDamage = damageAfterArmor(target, damage);
           addLog(`<strong>${escapeHtml(attacker.name)}</strong> rolls ${roll}/20 and ${critical ? "lands a critical hit on" : "hits"} <strong>${escapeHtml(target.name)}</strong> for ${actualDamage} damage${weapon ? ` with ${escapeHtml(weapon.name)}` : ""}.${awarenessRoll === null ? "" : ` Awareness roll: ${awarenessRoll}/20.`}`);
-          applyDamage(target, damage, critical ? "is critically hit" : "is hit");
+          applyDamage(target, actualDamage, critical ? "is critically hit" : "is hit", true);
+          if (target.hp <= 0 && yieldsLeather(target)) {
+            const leather = Math.floor(Math.random() * 3) + 1;
+            addResource(attacker, "leather", leather);
+            addLog(`<strong>${escapeHtml(attacker.name)}</strong> collects ${leather} leather from ${escapeHtml(target.name)}.`);
+          }
+          if (weapon) wearItem(attacker, weapon);
         }
 
-        if (target.hp > 0 && awarenessRoll !== null) {
+        if (target.hp > 0 && awarenessRoll !== null && !isPassiveAnimal(target)) {
           if (awarenessRoll <= 5) {
             setHostile(target, attacker, -100);
             addLog(`<strong>${escapeHtml(target.name)}</strong> recognizes ${escapeHtml(attacker.name)} and becomes aggressive!`);
@@ -2884,6 +3597,62 @@
       function setHostile(target, aggressor, relationship = -100) {
         if (!target.hostileTo.includes(aggressor.id)) target.hostileTo.push(aggressor.id);
         state.relationships[relationshipKey(target.id, aggressor.id)] = relationship;
+        equipAvailableCombatGear(target);
+      }
+
+      function equipAvailableCombatGear(entity) {
+        const weapon = findUsableWeapon(entity);
+        const armor = findUsableArmor(entity);
+        entity.equippedWeaponId = weapon?.id || null;
+        entity.equippedArmorId = armor?.id || null;
+      }
+
+      function moveAwayFrom(actor, target) {
+        const distance = distanceBetween(actor, target);
+        const angle = distance > 0 ? null : Math.random() * Math.PI * 2;
+        const directionX = distance > 0 ? (actor.location.x - target.location.x) / distance : Math.cos(angle);
+        const directionY = distance > 0 ? (actor.location.y - target.location.y) / distance : Math.sin(angle);
+        const distanceToMove = Math.min(3, distance || 3);
+        actor.location.x = Math.max(0, Math.min(state.worldWidth, actor.location.x + directionX * distanceToMove));
+        actor.location.y = Math.max(0, Math.min(state.worldHeight, actor.location.y + directionY * distanceToMove));
+      }
+
+      function findUsableWeapon(entity) {
+        return state.objects.find((item) => entity.inventory.includes(item.id)
+          && itemCategory(item) === "weapon"
+          && getObjectDurability(item) > 0
+          && (!/\b(gun|pistol|rifle)\b/i.test(`${item.name} ${item.type}`) || entity.resources.bullets > 0));
+      }
+
+      function findUsableArmor(entity) {
+        return state.objects.find((item) => entity.inventory.includes(item.id)
+          && itemCategory(item) === "armor" && getObjectDurability(item) > 0);
+      }
+
+      function prepareForHostility(actor) {
+        const weapon = findUsableWeapon(actor);
+        if (!weapon) {
+          actor.equippedWeaponId = null;
+          const recipe = itemRecipes.find((itemRecipe) => itemRecipe.category === "weapon"
+            && !/\b(gun|pistol|rifle)\b/i.test(itemRecipe.name)
+            && hasResources(actor, itemRecipe.costs));
+          if (recipe) craftAction(`craft ${recipe.name}`, actor, false);
+          else resourceForage("search resources", actor, false);
+          return true;
+        }
+        actor.equippedWeaponId = weapon.id;
+
+        const armor = findUsableArmor(actor);
+        if (!armor) {
+          actor.equippedArmorId = null;
+          const recipe = itemRecipes.find((itemRecipe) => itemRecipe.category === "armor"
+            && hasResources(actor, itemRecipe.costs));
+          if (recipe) craftAction(`craft ${recipe.name}`, actor, false);
+          else resourceForage("search resources", actor, false);
+          return true;
+        }
+        actor.equippedArmorId = armor.id;
+        return false;
       }
 
       function isPickpocketAction(actionText) {
@@ -3154,12 +3923,55 @@
         }
 
         const actionText = elements.actionText.value.trim() || "takes a bold action";
-        const requiresRoll = elements.needsRoll.checked;
         const target = findActionTarget(actionText);
         const intent = socialIntent(actionText);
 
         if (/\b(search|scavenge|forage|look)\b.*\b(food|berries|mushrooms|ration)\b/i.test(actionText)) {
           searchForFood(actor);
+          return;
+        }
+
+        if (isResourceAction(actionText)) {
+          elements.actionText.value = "";
+          resourceForage(actionText, actor);
+          render();
+          return;
+        }
+
+        if (transformResourceAction(actionText, actor)) {
+          elements.actionText.value = "";
+          render();
+          return;
+        }
+
+        if (/\brepair\b/i.test(actionText)) {
+          if (repairAction(actionText, actor)) {
+            elements.actionText.value = "";
+            render();
+          }
+          return;
+        }
+
+        if (/\bupgrade\b/i.test(actionText)) {
+          if (upgradeAction(actionText, actor)) {
+            elements.actionText.value = "";
+            render();
+          }
+          return;
+        }
+
+        if (/\bcraft\b.*\b(knife|gun|pistol|rifle|armor|armour|shield|shop|store|market|house|home|hut|building|tower|castle|bullets?|ammo)\b/i.test(actionText)) {
+          if (craftAction(actionText, actor)) {
+            elements.actionText.value = "";
+            render();
+          }
+          return;
+        }
+
+        if (/\b(walk|walking|run|running|sprint|sprinting)\b.*\bto\b/i.test(actionText)) {
+          travelToTarget(actionText, actor);
+          elements.actionText.value = "";
+          render();
           return;
         }
 
@@ -3181,10 +3993,13 @@
             return;
           }
 
+          if (resolveAttack(actor, target) === false) {
+            elements.actionText.value = "";
+            render();
+            return;
+          }
           actor.turnUsed = true;
-          resolveAttack(actor, target);
           elements.actionText.value = "";
-          elements.needsRoll.checked = false;
           finishActorTurn(actor);
           return;
         }
@@ -3193,7 +4008,6 @@
           actor.turnUsed = true;
           resolveSocialAction(actor, target, actionText, intent);
           elements.actionText.value = "";
-          elements.needsRoll.checked = false;
           finishActorTurn(actor);
           return;
         }
@@ -3204,31 +4018,24 @@
           return;
         }
 
-        let resultText = "Success (no roll).";
-
-        if (requiresRoll) {
-          const roll = rollD20(actor, actionStat(actionText));
-          if (roll === 20) {
-            resultText = `<span class="crit success">Critical success</span>! D20 roll: <strong>${roll}</strong>.`;
-          } else if (roll === 1) {
-            resultText = `<span class="crit fail">Critical fail</span>! D20 roll: <strong>${roll}</strong>.`;
-          } else if (roll >= 12) {
-            resultText = `Success! D20 roll: <strong>${roll}</strong>.`;
-          } else {
-            resultText = `Failure. D20 roll: <strong>${roll}</strong>.`;
-          }
-        }
+        const roll = rollD20(actor, actionStat(actionText));
+        const resultText = roll === 20
+          ? `<span class="crit success">Critical success</span>! D20 roll: <strong>${roll}</strong>.`
+          : roll === 1
+            ? `<span class="crit fail">Critical fail</span>! D20 roll: <strong>${roll}</strong>.`
+            : roll >= 12
+              ? `Success! D20 roll: <strong>${roll}</strong>.`
+              : `Failure. D20 roll: <strong>${roll}</strong>.`;
 
         actor.turnUsed = true;
         addLog(`<strong>${escapeHtml(actor.name)}</strong> tries: “${escapeHtml(actionText)}”. ${resultText}`, actor);
 
         elements.actionText.value = "";
-        elements.needsRoll.checked = false;
 
         finishActorTurn(actor);
       }
 
-      function finishActorTurn(actor) {
+      function finishActorTurn(actor, skipCreation = false) {
         if (state.relationshipEvent) {
           state.deferredTurnActorId = actor.id;
           render();
@@ -3239,6 +4046,12 @@
             render();
             return;
           }
+          advanceTurn();
+          render();
+          scheduleAiTurn();
+          return;
+        }
+        if (skipCreation) {
           advanceTurn();
           render();
           scheduleAiTurn();
@@ -3278,7 +4091,8 @@
         if (!actor || actor.isPlayer || actor.turnUsed) return;
 
         const hatedTarget = state.entities.find((entity) => actor.hostileTo.includes(entity.id) && entity.hp > 0);
-        if (hatedTarget) {
+        if (hatedTarget && !isPassiveAnimal(actor)) {
+          if (prepareForHostility(actor)) return;
           actor.turnUsed = true;
           addLog(`<strong>${escapeHtml(actor.name)}</strong> seeks revenge and attacks ${escapeHtml(hatedTarget.name)}.`);
           resolveAttack(actor, hatedTarget);
@@ -3288,15 +4102,50 @@
 
         const suspiciousTarget = state.entities.find((entity) => actor.suspiciousOf.includes(entity.id) && entity.hp > 0);
         if (suspiciousTarget) {
+          equipAvailableCombatGear(actor);
+          moveAwayFrom(actor, suspiciousTarget);
           actor.turnUsed = true;
-          addLog(`<strong>${escapeHtml(actor.name)}</strong> keeps their distance from ${escapeHtml(suspiciousTarget.name)} and stays on guard.`);
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> moves away from ${escapeHtml(suspiciousTarget.name)} and stays on guard.`);
           beginTurnCreation(actor);
           return;
         }
 
+        if (!isPassiveAnimal(actor) && ["combat", "murdering"].includes(actor.priority)) {
+          const target = randomFrom(state.entities.filter((entity) => entity.id !== actor.id && entity.hp > 0));
+          if (target) {
+            actor.turnUsed = true;
+            const action = actor.priority === "murdering" ? "pursues their serial-killer obsession and attacks" : "seeks combat and attacks";
+            addLog(`<strong>${escapeHtml(actor.name)}</strong> ${action} <strong>${escapeHtml(target.name)}</strong>.`);
+            resolveAttack(actor, target);
+            finishActorTurn(actor);
+            return;
+          }
+        }
+
+        if (actor.priority === "survival") {
+          searchForFood(actor);
+          return;
+        }
+
+        if (["building", "crafting", "trading", "selling"].includes(actor.priority)) {
+          const resourceAction = actor.priority === "building"
+            ? `search for ${randomFrom(["wood", "stone"])}`
+            : "search resources";
+          resourceForage(resourceAction, actor, false);
+          return;
+        }
+
         const socialTarget = randomFrom(state.entities.filter((entity) => entity.id !== actor.id && entity.hp > 0));
-        if (socialTarget && Math.random() < 0.35) {
+        const socialPriorities = ["friendship", "charming", "manipulating"];
+        const shouldSeekSocial = socialPriorities.includes(actor.priority)
+          || (!actor.priority && Math.random() < 0.35);
+        if (socialTarget && shouldSeekSocial) {
           actor.turnUsed = true;
+          const socialAction = {
+            friendship: `says hello to ${socialTarget.name}`,
+            charming: `compliments ${socialTarget.name}`,
+            manipulating: `asks ${socialTarget.name} a question`
+          }[actor.priority] || `says hello to ${socialTarget.name}`;
           if (socialTarget.isPlayer) {
             const player = socialTarget;
             state.deferredTurnActorId = actor.id;
@@ -3334,12 +4183,21 @@
             render();
             return;
           }
-          resolveSocialAction(actor, socialTarget, `says hello to ${socialTarget.name}`, intent);
+          const intent = socialIntent(socialAction) || socialIntent("hello");
+          resolveSocialAction(actor, socialTarget, socialAction, intent);
           finishActorTurn(actor);
           return;
         }
 
-        const actions = [
+        const priorityActions = {
+          exploration: [`explores the area around ${actor.type.toLowerCase()}`],
+          building: ["plans a building project"],
+          trading: ["looks for a shop to trade goods"],
+          crafting: ["works on crafting an item"],
+          selling: ["tries to sell goods at a shop"],
+          manipulating: ["plans how to influence others"]
+        };
+        const actions = priorityActions[actor.priority] || [
           `explores the area around ${actor.type.toLowerCase()}`,
           `looks for something interesting nearby`,
           `practices a new ${actor.type.toLowerCase()} skill`,
@@ -3367,6 +4225,7 @@
         state.round += 1;
         state.day += 1;
         state.turnCounter += 1;
+        wearItemsForNewDay();
         state.entities.forEach((entity) => {
           entity.turnUsed = false;
         });
@@ -3395,7 +4254,8 @@
             gender: elements.playerGender.value,
             age,
             sexuality: elements.playerSexuality.value,
-            traits: selectedPlayerTraits()
+            traits: selectedPlayerTraits(),
+            description: elements.playerDescription.value.trim()
           });
           elements.playerSetupDialog.close();
           render();
@@ -3422,6 +4282,15 @@
           if (!state.pendingCreationActorId) return;
           state.pendingCreationType = "object";
           render();
+        });
+        elements.skipCreation.addEventListener("click", () => {
+          const actorId = state.pendingCreationActorId;
+          if (!actorId) return;
+          addLog("The player skips end-of-turn creation.");
+          completeTurnCreation(actorId);
+        });
+        elements.beingPriorityMode.addEventListener("change", () => {
+          elements.beingPriorityLabel.hidden = elements.beingPriorityMode.value !== "choose";
         });
         elements.randomIconBtn.addEventListener("click", updateCreatureIcon);
         elements.beingType.addEventListener("input", updateCreatureIcon);
@@ -3454,9 +4323,15 @@
         };
         elements.objectName.addEventListener("input", suggestObjectSize);
         elements.objectType.addEventListener("input", suggestObjectSize);
+        elements.objectName.addEventListener("input", updateObjectRecipeInfo);
+        elements.objectType.addEventListener("input", updateObjectRecipeInfo);
         elements.openInventory.addEventListener("click", () => {
           renderInventory();
           if (!elements.inventoryDialog.open) elements.inventoryDialog.showModal();
+        });
+        elements.mapBtn.addEventListener("click", () => {
+          renderMap();
+          if (!elements.mapDialog.open) elements.mapDialog.showModal();
         });
         document.querySelectorAll("[data-close-dialog]").forEach((button) => {
           button.addEventListener("click", () => document.getElementById(button.dataset.closeDialog).close());
@@ -3480,6 +4355,7 @@
         setupEvents();
         updateSexualityOptions(elements.beingGender, elements.beingSexuality);
         updateSexualityOptions(elements.playerGender, elements.playerSexuality);
+        renderTraitGuides();
         renderPlayerTraitOptions();
         render();
         elements.playerSetupDialog.showModal();
