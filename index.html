@@ -241,6 +241,66 @@
 
       .checkbox-row input { width: auto; accent-color: var(--accent-2); }
 
+      .dice-tray {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        min-height: 76px;
+        padding: 10px 14px;
+        background: rgba(148, 163, 184, 0.06);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+      }
+
+      .dice-result {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 116px;
+        padding: 6px 9px;
+        background: rgba(15, 23, 42, 0.5);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+      }
+
+      .dice-face {
+        display: grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        flex: 0 0 auto;
+        color: white;
+        font-size: 1.1rem;
+        font-weight: 800;
+        background: linear-gradient(145deg, var(--accent), #5b21b6);
+        border: 2px solid rgba(255, 255, 255, 0.65);
+        border-radius: 12px;
+        box-shadow: 0 6px 18px rgba(91, 33, 182, 0.4);
+      }
+
+      .dice-face.rolling {
+        animation: dice-roll 0.8s ease-in-out;
+      }
+
+      .dice-result-status {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.78rem;
+      }
+
+      @keyframes dice-roll {
+        0% { transform: rotate(0) translateY(0) scale(1); }
+        25% { transform: rotate(100deg) translateY(-12px) scale(1.08); }
+        50% { transform: rotate(220deg) translateY(0) scale(0.95); }
+        75% { transform: rotate(320deg) translateY(-6px) scale(1.04); }
+        100% { transform: rotate(360deg) translateY(0) scale(1); }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .dice-face.rolling { animation: none; }
+      }
+
       .entity-list {
         display: flex;
         flex-direction: column;
@@ -430,6 +490,45 @@
       }
 
       .entity-stats[hidden] { display: none; }
+
+      .entity-trait-stats {
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+        margin: 0;
+        padding: 10px 12px;
+        background: rgba(15, 23, 42, 0.45);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+
+      .entity-trait-stats[hidden] { display: none; }
+      .entity-trait-stats h4 { margin: 0; font-size: 0.8rem; }
+      .entity-trait-list { display: flex; flex-direction: column; gap: 8px; }
+      .entity-trait-row { display: flex; flex-direction: column; gap: 4px; }
+      .entity-trait-label { display: flex; justify-content: space-between; gap: 8px; font-size: 0.72rem; }
+      .entity-trait-value { flex: 0 0 auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+      .entity-trait-track {
+        position: relative;
+        height: 10px;
+        overflow: hidden;
+        background: rgba(148, 163, 184, 0.14);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+      }
+      .entity-trait-fill { position: absolute; top: 0; bottom: 0; transition: width 0.25s ease; }
+      .entity-trait-fill.negative { right: 50%; background: #ef5361; }
+      .entity-trait-fill.positive { left: 50%; background: #42ce83; }
+      .entity-trait-zero {
+        position: absolute;
+        z-index: 1;
+        top: -1px;
+        bottom: -1px;
+        left: calc(50% - 1px);
+        width: 2px;
+        background: #fff;
+        box-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+      }
 
       .entity-inventory {
         display: flex;
@@ -681,6 +780,12 @@
       .inventory-item + .inventory-item { margin-top: 10px; }
       .inventory-item-actions { display: flex; flex-wrap: wrap; gap: 8px; }
       .equipment-summary { color: var(--muted); margin-bottom: 14px; }
+      .trait-picker { display: grid; gap: 8px; }
+      .trait-option { display: flex; flex-direction: row; align-items: flex-start; gap: 10px; padding: 10px; background: rgba(148, 163, 184, 0.06); border: 1px solid var(--line); border-radius: 10px; }
+      .trait-option input { width: auto; margin-top: 4px; accent-color: var(--accent-2); }
+      .trait-option span { display: grid; gap: 3px; }
+      .trait-option small, .trait-selection-status { color: var(--muted); font-weight: 400; }
+      .trait-selection-status { margin: 0; font-size: 0.85rem; }
 
       @media (max-width: 1100px) {
         .layout {
@@ -842,6 +947,10 @@
                 <span>Roll a d20 for this action (attacks always roll: 1–7 self-damage, 8–15 hit, 16–20 critical)</span>
               </label>
 
+              <div id="diceTray" class="dice-tray" aria-live="polite">
+                <p class="dice-result-status">Ready to roll</p>
+              </div>
+
               <button type="submit" class="primary">Resolve Turn</button>
             </form>
             <dialog id="pickpocketDialog" class="modal-dialog">
@@ -917,6 +1026,9 @@
             <option value="lesbian">Lesbian</option>
           </select>
         </label>
+        <p>Choose up to three traits. A counter trait will be assigned when you start.</p>
+        <div id="playerTraitOptions" class="trait-picker"></div>
+        <p id="traitSelectionStatus" class="trait-selection-status" aria-live="polite"></p>
         <button type="submit" class="primary">Start Game</button>
       </form>
     </dialog>
@@ -951,6 +1063,11 @@
       let aiTurnTimer = null;
       let pickpocketClock = null;
       let pickpocketSliderTimer = null;
+      const diceRollQueue = [];
+      let diceRollNumber = 0;
+      let isDiceAnimating = false;
+      let diceRollInterval = null;
+      let diceRollTimeout = null;
 
       const elements = {
         createForm: document.getElementById("createForm"),
@@ -979,6 +1096,7 @@
         actionForm: document.getElementById("actionForm"),
         actionText: document.getElementById("actionText"),
         needsRoll: document.getElementById("needsRoll"),
+        diceTray: document.getElementById("diceTray"),
         entityList: document.getElementById("entityList"),
         objectList: document.getElementById("objectList"),
         inventoryList: document.getElementById("inventoryList"),
@@ -1006,6 +1124,8 @@
         relationshipDialog: document.getElementById("relationshipDialog"),
         playerSetupDialog: document.getElementById("playerSetupDialog"),
         playerSetupForm: document.getElementById("playerSetupForm"),
+        playerTraitOptions: document.getElementById("playerTraitOptions"),
+        traitSelectionStatus: document.getElementById("traitSelectionStatus"),
         playerName: document.getElementById("playerName"),
         playerGender: document.getElementById("playerGender"),
         playerAge: document.getElementById("playerAge"),
@@ -1017,6 +1137,219 @@
 
       function randomFrom(list) {
         return list[Math.floor(Math.random() * list.length)];
+      }
+
+      const positiveTraits = [
+        { name: "Strong", stat: "strength", opposite: "Weak", hp: 5, description: "Powerful and physically capable." },
+        { name: "Smart", stat: "intelligence", opposite: "Foolish", description: "Quick to understand and solve problems." },
+        { name: "Charismatic", stat: "charisma", opposite: "Socially Awkward", description: "Naturally persuasive and personable." },
+        { name: "Fast", stat: "agility", opposite: "Slow", description: "Quick on their feet." },
+        { name: "Brave", stat: "courage", opposite: "Timid", description: "Stays composed in danger." },
+        { name: "Perceptive", stat: "perception", opposite: "Oblivious", description: "Notices details others miss." },
+        { name: "Agile", stat: "dexterity", opposite: "Clumsy", description: "Moves with balance and precision." },
+        { name: "Resilient", stat: "vitality", opposite: "Fragile", hp: 5, description: "Endures hardship and injury." },
+        { name: "Intimidating", stat: "presence", opposite: "Unassuming", description: "Commands attention and respect." },
+        { name: "Lucky", stat: "luck", opposite: "Unlucky", description: "Seems to have fortune on their side." },
+        { name: "Resourceful", stat: "survival", opposite: "Careless", description: "Makes the most of what is available." },
+        { name: "Wise", stat: "wisdom", opposite: "Naive", description: "Uses experience and good judgment." }
+      ];
+      const counterTraits = positiveTraits.map((trait) => ({
+        name: trait.opposite,
+        stat: trait.stat,
+        opposite: trait.name,
+        hp: trait.hp ? -trait.hp : 0,
+        description: `Has difficulty with ${trait.stat}.`
+      }));
+      const traitStats = [
+        ["strength", "Strength"],
+        ["intelligence", "Intelligence"],
+        ["charisma", "Charisma"],
+        ["agility", "Agility"],
+        ["courage", "Courage"],
+        ["perception", "Perception"],
+        ["dexterity", "Dexterity"],
+        ["vitality", "Vitality"],
+        ["presence", "Presence"],
+        ["luck", "Luck"],
+        ["survival", "Survival"],
+        ["wisdom", "Wisdom"]
+      ];
+      const creatureTraitProfiles = [
+        {
+          match: /\bfox(?:es)?\b/i,
+          strengths: ["Fast", "Smart", "Agile", "Perceptive", "Resourceful", "Lucky"],
+          counters: ["Weak", "Clumsy", "Fragile", "Timid", "Careless"]
+        },
+        {
+          match: /\bdragons?\b/i,
+          strengths: ["Strong", "Intimidating", "Brave", "Resilient", "Wise", "Lucky"],
+          counters: ["Slow", "Clumsy", "Foolish", "Unlucky", "Socially Awkward"]
+        },
+        {
+          match: /\b(unicorns?|mermaids?|sirens?|centaurs?|phoenix(?:es)?|griffins?|pegasi|fairies|fae)\b/i,
+          strengths: ["Wise", "Smart", "Charismatic", "Fast", "Lucky", "Perceptive", "Brave"],
+          counters: ["Fragile", "Naive", "Slow", "Unlucky", "Timid", "Careless"]
+        },
+        {
+          match: /\b(bees?|ants?|beetles?|butterflies|caterpillars?|insects?|flies|mosquitoes|moths?|wasps?)\b/i,
+          strengths: ["Fast", "Agile", "Resourceful", "Perceptive", "Brave"],
+          counters: ["Weak", "Fragile", "Foolish", "Clumsy", "Timid"]
+        },
+        {
+          match: /\b(birds?|eagles?|falcons?|hawks?|owls?|ravens?|crows?|sparrows?|ducks?|swans?)\b/i,
+          strengths: ["Fast", "Agile", "Perceptive", "Wise", "Lucky"],
+          counters: ["Weak", "Fragile", "Careless", "Foolish", "Unlucky"]
+        },
+        {
+          match: /\b(wolves?|dogs?|foxes?|coyotes?|jackals?)\b/i,
+          strengths: ["Fast", "Brave", "Perceptive", "Resourceful", "Charismatic"],
+          counters: ["Foolish", "Careless", "Weak", "Timid", "Socially Awkward"]
+        },
+        {
+          match: /\b(cats?|lions?|tigers?|leopards?|panthers?|lynxes?|cougars?|cheetahs?)\b/i,
+          strengths: ["Agile", "Fast", "Strong", "Perceptive", "Lucky"],
+          counters: ["Careless", "Weak", "Clumsy", "Timid", "Foolish"]
+        },
+        {
+          match: /\b(bears?|boars?|gorillas?|apes?|ogres?|trolls?|giants?)\b/i,
+          strengths: ["Strong", "Resilient", "Brave", "Intimidating", "Resourceful"],
+          counters: ["Slow", "Foolish", "Clumsy", "Socially Awkward", "Careless"]
+        },
+        {
+          match: /\b(sharks?|whales?|dolphins?|seals?|octopuses|squids?|fish|crocodiles?|alligators?|turtles?)\b/i,
+          strengths: ["Strong", "Fast", "Perceptive", "Wise", "Resilient"],
+          counters: ["Clumsy", "Slow", "Foolish", "Timid", "Unlucky"]
+        },
+        {
+          match: /\b(snakes?|lizards?|geckos?|chameleons?|reptiles?)\b/i,
+          strengths: ["Agile", "Fast", "Perceptive", "Smart", "Lucky"],
+          counters: ["Slow", "Clumsy", "Timid", "Careless", "Foolish"]
+        },
+        {
+          match: /\b(horses?|deer|rabbits?|hares?|mice|rats?|squirrels?|sheep|goats?|cows?|bison|elephants?)\b/i,
+          strengths: ["Fast", "Perceptive", "Resilient", "Resourceful", "Lucky"],
+          counters: ["Timid", "Weak", "Foolish", "Clumsy", "Unlucky"]
+        },
+        {
+          match: /\b(robots?|machines?|androids?|golems?|automatons?)\b/i,
+          strengths: ["Strong", "Smart", "Resilient", "Perceptive", "Intimidating"],
+          counters: ["Socially Awkward", "Slow", "Clumsy", "Foolish", "Careless"]
+        },
+        {
+          match: /\b(humans?|people|person|elves?|dwarves?|dwarfs?|halflings?|hobbits?|goblins?|orcs?|gnomes?)\b/i,
+          strengths: ["Smart", "Charismatic", "Resourceful", "Brave", "Agile", "Wise"],
+          counters: ["Foolish", "Timid", "Careless", "Socially Awkward", "Weak"]
+        },
+        {
+          match: /\b(spirits?|ghosts?|wraiths?|undead|vampires?|liches?|skeletons?|zombies?)\b/i,
+          strengths: ["Wise", "Perceptive", "Intimidating", "Lucky", "Smart"],
+          counters: ["Fragile", "Slow", "Unlucky", "Unassuming", "Careless"]
+        },
+        {
+          match: /\b(demons?|devils?|angels?|gods?|goddesses|deit(?:y|ies)|titans?)\b/i,
+          strengths: ["Strong", "Wise", "Intimidating", "Charismatic", "Resilient", "Lucky"],
+          counters: ["Slow", "Foolish", "Unlucky", "Careless", "Socially Awkward"]
+        },
+        {
+          match: /\b(plants?|trees?|flowers?|vines?|mushrooms?|treants?|fungi)\b/i,
+          strengths: ["Resilient", "Wise", "Resourceful", "Perceptive", "Lucky"],
+          counters: ["Slow", "Clumsy", "Weak", "Careless", "Unlucky"]
+        },
+        {
+          match: /\b(elementals?|fire|water|earth|air|ice|lightning|shadow)\b/i,
+          strengths: ["Strong", "Fast", "Resilient", "Intimidating", "Wise", "Lucky"],
+          counters: ["Slow", "Fragile", "Careless", "Foolish", "Unlucky"]
+        },
+        {
+          match: /\b(monsters?|beasts?|creatures?)\b/i,
+          strengths: ["Strong", "Fast", "Brave", "Perceptive", "Resilient", "Intimidating"],
+          counters: ["Slow", "Foolish", "Clumsy", "Timid", "Careless"]
+        },
+        {
+          match: /.*/,
+          strengths: ["Smart", "Resourceful", "Agile", "Perceptive", "Brave", "Charismatic", "Lucky", "Wise"],
+          counters: ["Weak", "Foolish", "Socially Awkward", "Slow", "Clumsy", "Fragile", "Timid", "Careless"]
+        }
+      ];
+
+      function getTrait(name) {
+        return [...positiveTraits, ...counterTraits].find((trait) => trait.name === name);
+      }
+
+      function chooseRandomTraits(traits, count) {
+        const choices = [...traits];
+        for (let index = choices.length - 1; index > 0; index -= 1) {
+          const swapIndex = Math.floor(Math.random() * (index + 1));
+          [choices[index], choices[swapIndex]] = [choices[swapIndex], choices[index]];
+        }
+        return choices.slice(0, count);
+      }
+
+      function getCreatureTraits(type) {
+        const profile = creatureTraitProfiles.find((entry) => entry.match.test(type));
+        const strengthPool = profile.strengths.map(getTrait).filter(Boolean);
+        const strengths = chooseRandomTraits(strengthPool, 3);
+        const scoreCuts = chooseRandomTraits([1, 2, 3, 4, 5, 6, 7, 8, 9], 2).sort((first, second) => first - second);
+        const strengthScores = chooseRandomTraits([scoreCuts[0], scoreCuts[1] - scoreCuts[0], 10 - scoreCuts[1]], 3);
+        const excludedCounters = new Set(strengths.map((trait) => trait.opposite));
+        const profileCounters = profile.counters.map(getTrait)
+          .filter((trait) => trait && !excludedCounters.has(trait.name));
+        const counterPool = profileCounters.length
+          ? profileCounters
+          : counterTraits.filter((trait) => !excludedCounters.has(trait.name));
+        const counter = randomFrom(counterPool);
+        const traits = [...strengths.map((trait) => trait.name), counter.name];
+        const modifiers = Object.fromEntries([
+          ...strengths.map((trait, index) => [trait.name, strengthScores[index]]),
+          [counter.name, -(Math.floor(Math.random() * 4) + 4)]
+        ]);
+        return { traits, modifiers };
+      }
+
+      function traitModifier(entity, stat) {
+        return (entity.traits || []).reduce((total, name) => {
+          const trait = getTrait(name);
+          if (!trait || trait.stat !== stat) return total;
+          return total + (entity.traitModifiers?.[name] ?? (counterTraits.includes(trait) ? -2 : 2));
+        }, 0);
+      }
+
+      function traitHpModifier(traits) {
+        return traits.reduce((total, name) => total + (getTrait(name)?.hp || 0), 0);
+      }
+
+      function renderPlayerTraitOptions() {
+        const options = chooseRandomTraits(positiveTraits, 10);
+        elements.playerTraitOptions.innerHTML = options.map((trait, index) => `
+          <label class="trait-option">
+            <input type="checkbox" name="playerTrait" value="${escapeHtml(trait.name)}" />
+            <span><strong>${escapeHtml(trait.name)}</strong><small>${escapeHtml(trait.description)} +2 ${escapeHtml(trait.stat)}${trait.hp ? `, ${trait.hp > 0 ? "+" : ""}${trait.hp} HP` : ""}</small></span>
+          </label>
+        `).join("");
+        elements.playerTraitOptions.querySelectorAll('input[name="playerTrait"]').forEach((input) => {
+          input.addEventListener("change", updatePlayerTraitSelection);
+        });
+        updatePlayerTraitSelection();
+      }
+
+      function updatePlayerTraitSelection() {
+        const choices = Array.from(elements.playerTraitOptions.querySelectorAll('input[name="playerTrait"]'));
+        const selectedCount = choices.filter((input) => input.checked).length;
+        choices.forEach((input) => {
+          input.disabled = !input.checked && selectedCount >= 3;
+        });
+        elements.traitSelectionStatus.textContent = `${selectedCount}/3 traits selected.`;
+      }
+
+      function selectedPlayerTraits() {
+        return Array.from(elements.playerTraitOptions.querySelectorAll('input[name="playerTrait"]:checked'))
+          .map((input) => input.value);
+      }
+
+      function assignPlayerCounterTrait(traits) {
+        const excluded = new Set(traits.map((name) => getTrait(name)?.opposite).filter(Boolean));
+        const available = counterTraits.filter((trait) => !excluded.has(trait.name));
+        return randomFrom(available).name;
       }
 
       function makeId() {
@@ -1326,7 +1659,7 @@
       }
 
       function resolveAffairOffer(candidate, player) {
-        const roll = rollD20();
+        const roll = rollD20(candidate, "charisma");
         if (roll <= 5) {
           const partner = state.entities.find((entity) => entity.id === player.partnerId);
           addLog(`<strong>${escapeHtml(candidate.name)}</strong> refuses the affair offer (d20: ${roll}) and tells your partner.`);
@@ -1338,7 +1671,7 @@
                 {
                   label: "Deny it",
                   action: () => {
-                    const denialRoll = rollD20();
+                    const denialRoll = rollD20(player, "charisma");
                     if (denialRoll <= 5) {
                       state.relationships[relationshipKey(partner.id, player.id)] = -68;
                       endRelationship(player, partner);
@@ -1379,6 +1712,7 @@
       function advanceTurn() {
         if (!state.entities.length) {
           state.currentIndex = 0;
+          clearDiceResults();
           return;
         }
 
@@ -1424,7 +1758,23 @@
             continue;
           }
 
+          clearDiceResults();
           return;
+        }
+
+        function clearDiceResults() {
+          diceRollQueue.length = 0;
+          if (diceRollInterval !== null) {
+            window.clearInterval(diceRollInterval);
+            diceRollInterval = null;
+          }
+          if (diceRollTimeout !== null) {
+            window.clearTimeout(diceRollTimeout);
+            diceRollTimeout = null;
+          }
+          isDiceAnimating = false;
+          diceRollNumber = 0;
+          elements.diceTray.innerHTML = '<p class="dice-result-status">Ready to roll</p>';
         }
       }
 
@@ -1540,6 +1890,13 @@
           statsToggle.setAttribute("aria-expanded", "false");
           statsToggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V5"></path><path d="M4 19h16"></path><path d="M8 15v-4"></path><path d="M12 15V8"></path><path d="M16 15V5"></path></svg>';
 
+          const traitsToggle = document.createElement("button");
+          traitsToggle.type = "button";
+          traitsToggle.className = "entity-stats-toggle";
+          traitsToggle.setAttribute("aria-label", `Show ${entity.name}'s trait stats`);
+          traitsToggle.setAttribute("aria-expanded", "false");
+          traitsToggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16"></path><path d="M4 12h16"></path><path d="M4 18h16"></path><circle cx="9" cy="6" r="2"></circle><circle cx="15" cy="12" r="2"></circle><circle cx="8" cy="18" r="2"></circle></svg>';
+
           const inventoryToggle = document.createElement("button");
           inventoryToggle.type = "button";
           inventoryToggle.className = "entity-stats-toggle";
@@ -1593,6 +1950,50 @@
           const sexuality = entity.sexuality || "unspecified";
           addStat("Gender", `${gender.charAt(0).toUpperCase()}${gender.slice(1)}`);
           addStat("Sexuality", `${sexuality.charAt(0).toUpperCase()}${sexuality.slice(1)}`);
+
+          const traitPanel = document.createElement("section");
+          traitPanel.className = "entity-trait-stats";
+          traitPanel.hidden = true;
+          const traitHeading = document.createElement("h4");
+          traitHeading.textContent = `Traits: ${(entity.traits || []).join(", ") || "None"}`;
+          traitPanel.appendChild(traitHeading);
+          const traitList = document.createElement("div");
+          traitList.className = "entity-trait-list";
+          traitStats.forEach(([stat, label]) => {
+            const modifier = traitModifier(entity, stat);
+            const row = document.createElement("div");
+            row.className = "entity-trait-row";
+            const statLabel = document.createElement("div");
+            statLabel.className = "entity-trait-label";
+            const statName = document.createElement("span");
+            statName.textContent = label;
+            const statValue = document.createElement("span");
+            statValue.className = "entity-trait-value";
+            statValue.textContent = modifier > 0 ? `+${modifier}` : String(modifier);
+            statLabel.appendChild(statName);
+            statLabel.appendChild(statValue);
+
+            const track = document.createElement("div");
+            track.className = "entity-trait-track";
+            track.setAttribute("role", "progressbar");
+            track.setAttribute("aria-label", `${entity.name} ${label} modifier`);
+            track.setAttribute("aria-valuemin", "-10");
+            track.setAttribute("aria-valuemax", "10");
+            track.setAttribute("aria-valuenow", String(modifier));
+            track.setAttribute("aria-valuetext", `${modifier >= 0 ? "+" : ""}${modifier}`);
+            const fill = document.createElement("div");
+            fill.className = `entity-trait-fill ${modifier < 0 ? "negative" : "positive"}`;
+            fill.style.width = `${Math.min(10, Math.abs(modifier)) / 20 * 100}%`;
+            const zero = document.createElement("div");
+            zero.className = "entity-trait-zero";
+            track.appendChild(fill);
+            track.appendChild(zero);
+
+            row.appendChild(statLabel);
+            row.appendChild(track);
+            traitList.appendChild(row);
+          });
+          traitPanel.appendChild(traitList);
           if (!entity.isPlayer) {
             const relationshipStatus = entity.relationshipStatus || "unspecified";
             addStat("Relationship status", relationshipStatus === "partnered"
@@ -1608,6 +2009,11 @@
             stats.hidden = !stats.hidden;
             statsToggle.setAttribute("aria-expanded", String(!stats.hidden));
             statsToggle.setAttribute("aria-label", `${stats.hidden ? "Show" : "Hide"} ${entity.name} stats`);
+          });
+          traitsToggle.addEventListener("click", () => {
+            traitPanel.hidden = !traitPanel.hidden;
+            traitsToggle.setAttribute("aria-expanded", String(!traitPanel.hidden));
+            traitsToggle.setAttribute("aria-label", `${traitPanel.hidden ? "Show" : "Hide"} ${entity.name}'s trait stats`);
           });
 
           const inventory = document.createElement("div");
@@ -1754,6 +2160,7 @@
 
           lineup.appendChild(name);
           cardActions.appendChild(statsToggle);
+          cardActions.appendChild(traitsToggle);
           cardActions.appendChild(inventoryToggle);
           if (relationshipsToggle) cardActions.appendChild(relationshipsToggle);
           lineup.appendChild(cardActions);
@@ -1761,6 +2168,7 @@
           meta.appendChild(health);
           if (relationshipsPanel) meta.appendChild(relationshipsPanel);
           meta.appendChild(stats);
+          meta.appendChild(traitPanel);
           meta.appendChild(inventory);
           meta.appendChild(badges);
           meta.appendChild(desc);
@@ -1911,7 +2319,7 @@
 
       function eatFood(player, food) {
         if (!player.inventory.includes(food.id) || itemCategory(food) !== "food") return;
-        const roll = rollD20();
+        const roll = rollD20(player, "luck");
         player.inventory = player.inventory.filter((itemId) => itemId !== food.id);
         state.objects = state.objects.filter((item) => item.id !== food.id);
         if (roll <= 5) {
@@ -1928,7 +2336,7 @@
       }
 
       function searchForFood(actor) {
-        const roll = rollD20();
+        const roll = rollD20(actor, "survival");
         actor.turnUsed = true;
         if (roll <= 5) {
           addLog(`<strong>${escapeHtml(actor.name)}</strong> searches for food but finds nothing (d20: ${roll}).`, actor);
@@ -2068,7 +2476,12 @@
       }
 
       function addEntity(entityInput, turnUsed = false) {
+        const generatedTraits = entityInput.traits
+          ? { traits: entityInput.traits, modifiers: entityInput.traitModifiers || {} }
+          : getCreatureTraits(entityInput.type);
+        const { traits, modifiers } = generatedTraits;
         const hp = startingHitPoints(entityInput.name, entityInput.type);
+        const maxHp = Math.max(1, hp + traitHpModifier(traits));
         const entity = {
           id: makeId(),
           name: entityInput.name.trim(),
@@ -2080,8 +2493,10 @@
           humanForm: Boolean(entityInput.humanForm),
           description: entityInput.description.trim() || "A bold and unforgettable being.",
           icon: entityInput.icon.trim() || randomFrom(iconChoices(entityInput.type, entityInput.gender)),
-          hp,
-          maxHp: hp,
+          traits,
+          traitModifiers: modifiers,
+          hp: maxHp,
+          maxHp,
           image: "",
           imageSource: "",
           hostileTo: [],
@@ -2121,6 +2536,8 @@
       }
 
       function initializePlayer(playerDetails) {
+        const traits = [...playerDetails.traits, assignPlayerCounterTrait(playerDetails.traits)];
+        const hp = Math.max(1, 50 + traitHpModifier(traits));
         const player = {
           id: makeId(),
           name: playerDetails.name,
@@ -2131,8 +2548,9 @@
           sexuality: playerDetails.sexuality,
           age: playerDetails.age,
           humanForm: false,
-          hp: 50,
-          maxHp: 50,
+          traits,
+          hp,
+          maxHp: hp,
           image: "",
           imageSource: "",
           hostileTo: [],
@@ -2159,6 +2577,7 @@
         const type = elements.beingType.value.trim();
         const icon = elements.beingIcon.value.trim() || "✨";
         const description = elements.beingDescription.value.trim();
+        const { traits, modifiers } = getCreatureTraits(type);
 
         if (!name || !type) {
           elements.beingName.focus();
@@ -2174,7 +2593,9 @@
           relationshipStatus: elements.beingRelationship.value,
           gender: elements.beingGender.value,
           sexuality: elements.beingSexuality.value,
-          humanForm: elements.beingHumanForm.checked
+          humanForm: elements.beingHumanForm.checked,
+          traits,
+          traitModifiers: modifiers
         }, true);
 
         elements.createForm.reset();
@@ -2306,8 +2727,62 @@
         scheduleAiTurn();
       }
 
-      function rollD20() {
-        return Math.floor(Math.random() * 20) + 1;
+      function rollD20(entity = null, stat = null) {
+        const rawResult = Math.floor(Math.random() * 20) + 1;
+        const modifier = entity && stat ? traitModifier(entity, stat) : 0;
+        const result = Math.max(1, Math.min(20, rawResult + modifier));
+        const rollCard = document.createElement("div");
+        rollCard.className = "dice-result";
+        const face = document.createElement("div");
+        face.className = "dice-face";
+        face.setAttribute("aria-hidden", "true");
+        face.textContent = "20";
+        const status = document.createElement("p");
+        status.className = "dice-result-status";
+        status.textContent = `Roll ${++diceRollNumber} queued`;
+        rollCard.appendChild(face);
+        rollCard.appendChild(status);
+        elements.diceTray.appendChild(rollCard);
+        diceRollQueue.push({ result, face, status, number: diceRollNumber });
+        animateNextDiceRoll();
+        return result;
+      }
+
+      function actionStat(actionText) {
+        if (/\b(search|scavenge|forage|food|berries|mushrooms?|ration)\b/i.test(actionText)) return "survival";
+        if (/\b(plan|solve|puzzle|learn|study|strategy|figure out)\b/i.test(actionText)) return "intelligence";
+        if (/\b(sneak|dodge|jump|climb|run|chase)\b/i.test(actionText)) return "agility";
+        if (/\b(notice|spot|watch|observe|look for)\b/i.test(actionText)) return "perception";
+        if (/\b(persuade|convince|negotiate|perform|entertain)\b/i.test(actionText)) return "charisma";
+        return "luck";
+      }
+
+      function animateNextDiceRoll() {
+        if (isDiceAnimating || diceRollQueue.length === 0) return;
+
+        isDiceAnimating = true;
+        const roll = diceRollQueue.shift();
+        roll.status.textContent = `Rolling d20 · Roll ${roll.number}`;
+        roll.face.classList.remove("rolling");
+        void roll.face.offsetWidth;
+        roll.face.classList.add("rolling");
+
+        diceRollInterval = window.setInterval(() => {
+          roll.face.textContent = String(Math.floor(Math.random() * 20) + 1);
+        }, 70);
+
+        diceRollTimeout = window.setTimeout(() => {
+          if (diceRollInterval !== null) {
+            window.clearInterval(diceRollInterval);
+            diceRollInterval = null;
+          }
+          diceRollTimeout = null;
+          roll.face.textContent = String(roll.result);
+          roll.face.classList.remove("rolling");
+          roll.status.textContent = `Roll ${roll.number}: ${roll.result}`;
+          isDiceAnimating = false;
+          animateNextDiceRoll();
+        }, 800);
       }
 
       function socialIntent(actionText) {
@@ -2363,8 +2838,8 @@
       }
 
       function resolveAttack(attacker, target) {
-        const roll = rollD20();
-        const awarenessRoll = attacker.isPlayer ? rollD20() : null;
+        const roll = rollD20(attacker, "strength");
+        const awarenessRoll = attacker.isPlayer ? rollD20(target, "perception") : null;
         const weapon = state.objects.find((item) => item.id === attacker.equippedWeaponId
           && attacker.inventory.includes(item.id) && itemCategory(item) === "weapon");
         const selfHitThreshold = weapon ? 3 : 7;
@@ -2433,7 +2908,7 @@
         const target = state.entities.find((entity) => entity.id === theft.targetId);
         if (!actor || !target) return;
 
-        const roll = rollD20();
+        const roll = rollD20(actor, "dexterity");
         if (roll <= 5) {
           setHostile(target, actor);
           addLog(`<strong>${escapeHtml(actor.name)}</strong> rolls ${roll}/20 while pickpocketing. ${escapeHtml(target.name)} catches them and will hate them from now on.`);
@@ -2616,8 +3091,8 @@
       }
 
       function resolveSocialAction(actor, target, actionText, intent) {
-        const approachRoll = rollD20();
-        const requestRoll = rollD20();
+        const approachRoll = rollD20(actor, "charisma");
+        const requestRoll = rollD20(actor, "charisma");
         const hasPartner = target.relationshipStatus === "partnered";
         const isNotInterested = target.relationshipStatus === "not-interested";
         const rapport = getRapport(target.id, actor.id);
@@ -2732,7 +3207,7 @@
         let resultText = "Success (no roll).";
 
         if (requiresRoll) {
-          const roll = rollD20();
+          const roll = rollD20(actor, actionStat(actionText));
           if (roll === 20) {
             resultText = `<span class="crit success">Critical success</span>! D20 roll: <strong>${roll}</strong>.`;
           } else if (roll === 1) {
@@ -2872,7 +3347,7 @@
           `tries to make a new friend`
         ];
         const action = randomFrom(actions);
-        const roll = rollD20();
+        const roll = rollD20(actor, actionStat(action));
         const outcome = roll === 20
           ? `<span class="crit success">Critical success</span>! D20 roll: <strong>20</strong>.`
           : roll === 1
@@ -2919,7 +3394,8 @@
             name,
             gender: elements.playerGender.value,
             age,
-            sexuality: elements.playerSexuality.value
+            sexuality: elements.playerSexuality.value,
+            traits: selectedPlayerTraits()
           });
           elements.playerSetupDialog.close();
           render();
@@ -3004,6 +3480,7 @@
         setupEvents();
         updateSexualityOptions(elements.beingGender, elements.beingSexuality);
         updateSexualityOptions(elements.playerGender, elements.playerSexuality);
+        renderPlayerTraitOptions();
         render();
         elements.playerSetupDialog.showModal();
         elements.playerName.focus();
