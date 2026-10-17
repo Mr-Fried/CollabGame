@@ -67,14 +67,17 @@
       .world-map {
         display: block;
         width: 100%;
-        max-height: 70vh;
+        max-height: 72vh;
         border: 1px solid var(--line);
         border-radius: 12px;
-        background: #10213a;
+        background: #24566d;
       }
 
-      .world-map-grid { stroke: rgba(255,255,255,0.12); stroke-width: 2; }
-      .world-map-label { fill: var(--text); font-size: 90px; font-weight: 700; paint-order: stroke; stroke: #090d1a; stroke-width: 12px; }
+      .world-map-grid { stroke: rgba(224, 242, 226, 0.2); stroke-width: 2; }
+      .world-map-label { fill: #fff8dc; font-size: 130px; font-weight: 700; paint-order: stroke; stroke: #223b31; stroke-width: 16px; }
+      .map-terrain-label { fill: #244834; font-size: 1.55px; font-weight: 700; letter-spacing: 0.08em; opacity: 0.8; }
+      .map-river { fill: none; stroke: #53bde0; stroke-width: 0.38; stroke-linecap: round; stroke-linejoin: round; }
+      .map-shore { fill: #97b879; stroke: #d7d49a; stroke-width: 0.35; }
       .resource-list { color: var(--muted); line-height: 1.6; }
 
       .eyebrow {
@@ -910,6 +913,13 @@
               Description
               <textarea id="beingDescription" rows="3" placeholder="Friendly, unfriendly, kind..."></textarea>
             </label>
+            <label>
+              Spawn location
+              <select id="beingSpawnLocation">
+                <option value="random">Random anywhere on the map</option>
+                <option value="nearby">Within 2 km of me</option>
+              </select>
+            </label>
             <label id="beingPriorityModeLabel" hidden>
               Creature priority
               <select id="beingPriorityMode">
@@ -983,6 +993,7 @@
               Description
               <textarea id="objectDescription" rows="3" placeholder="A mysterious shop that appears at dusk..."></textarea>
             </label>
+            <p>Weapons and tools must be crafted as a turn action using gathered resources. Building a shop or house also requires a hammer.</p>
             <p id="objectRecipeInfo" class="equipment-summary" aria-live="polite"></p>
 
             <button type="submit" class="primary">Create Object and End Turn</button>
@@ -1117,8 +1128,8 @@
     <dialog id="mapDialog" class="modal-dialog">
       <section class="dialog-content">
         <h2>World Map</h2>
-        <p>World scale: approximately 9,000 × 5,000 km. Each grid square represents 500 km.</p>
-        <svg id="worldMap" class="world-map" viewBox="0 0 9000 5000" role="img" aria-label="World map showing all creatures"></svg>
+        <p>Each interaction square is 500 meters. The illustrated map covers approximately 9,000 × 5,000 km; grid lines are simplified at this world-scale view.</p>
+        <svg id="worldMap" class="world-map" viewBox="0 0 9000 5000" role="img" aria-label="Illustrated map showing rivers, forests, and creature locations"></svg>
         <div class="dialog-actions"><button type="button" class="ghost small" data-close-dialog="mapDialog">Close</button></div>
       </section>
     </dialog>
@@ -1144,6 +1155,7 @@
         worldHeight: 5000
       };
 
+      const MAP_SQUARE_KM = 0.5;
       let aiTurnTimer = null;
       let pickpocketClock = null;
       let pickpocketSliderTimer = null;
@@ -1170,6 +1182,7 @@
         beingRelationship: document.getElementById("beingRelationship"),
         beingIcon: document.getElementById("beingIcon"),
         beingDescription: document.getElementById("beingDescription"),
+        beingSpawnLocation: document.getElementById("beingSpawnLocation"),
         beingPriorityModeLabel: document.getElementById("beingPriorityModeLabel"),
         beingPriorityMode: document.getElementById("beingPriorityMode"),
         beingPriorityLabel: document.getElementById("beingPriorityLabel"),
@@ -1237,26 +1250,37 @@
 
       const resourceNames = {
         stick: "Sticks",
+        string: "String",
         wood: "Wood",
         stone: "Stone",
+        "stone chunk": "Stone chunks",
         metal: "Metal ore",
         "scrap metal": "Scrap metal",
         sand: "Sand",
         leather: "Leather",
         gunpowder: "Gunpowder",
-        bullets: "Bullets"
+        bullets: "Bullets",
+        arrows: "Arrows",
+        "throwing knives": "Throwing knives"
       };
-      const resourceSearchOptions = ["stick", "wood", "stone", "metal", "sand"];
+      const resourceSearchOptions = ["stick", "stone", "string", "sand", "leather"];
       const itemRecipes = [
         { match: /\b(wooden knife|wood knife)\b/i, name: "Wooden Knife", category: "weapon", costs: { stick: 1 }, durability: 20 },
         { match: /\b(stone knife)\b/i, name: "Stone Knife", category: "weapon", costs: { stone: 1 }, durability: 35 },
         { match: /\b(iron knife|metal knife)\b/i, name: "Iron Knife", category: "weapon", costs: { "scrap metal": 1 }, durability: 60 },
-        { match: /\b(gun|pistol|rifle)\b/i, name: "Gun", category: "weapon", costs: { "scrap metal": 1, metal: 1, gunpowder: 1 }, durability: 50 },
+        { match: /\b(bow)\b/i, name: "Bow", category: "weapon", costs: { stick: 2, string: 1 }, durability: 35, range: 2, ammo: "arrows", blueprintRequired: true },
+        { match: /\b(throwing knives|throwing knife ammo)\b/i, name: "Throwing Knives", category: "ammunition", costs: { stone: 2, stick: 1 }, amount: 5 },
+        { match: /\b(throwing knife)\b/i, name: "Throwing Knife", category: "weapon", costs: { stone: 2, stick: 1 }, durability: 15, range: 2, ammo: "throwing knives" },
+        { match: /\b(gun|pistol|rifle)\b/i, name: "Gun", category: "weapon", costs: { "scrap metal": 1, metal: 1, gunpowder: 1 }, durability: 50, range: 2, ammo: "bullets" },
         { match: /\b(leather armor|leather armour)\b/i, name: "Leather Armor", category: "armor", costs: { leather: 2 }, durability: 40 },
         { match: /\b(iron armor|metal armor|iron armour|metal armour)\b/i, name: "Iron Armor", category: "armor", costs: { "scrap metal": 3 }, durability: 70 },
         { match: /\b(wooden shield|wood shield)\b/i, name: "Wooden Shield", category: "armor", costs: { stick: 2 }, durability: 30 },
-        { match: /\b(shop|store|market)\b/i, name: "Shop", category: null, costs: { wood: 10, stone: 5 } },
-        { match: /\b(house|home|hut|building|tower|castle)\b/i, name: "House", category: null, costs: { wood: 6, stone: 4 } },
+        { match: /\b(pickaxe|pick ax)\b/i, name: "Pickaxe", category: "tool", costs: { stick: 2, string: 1 }, durability: 40 },
+        { match: /\b(axe|hatchet)\b/i, name: "Axe", category: "tool", costs: { stone: 2, stick: 1, string: 1 }, durability: 40 },
+        { match: /\b(hammer)\b/i, name: "Hammer", category: "tool", costs: { stone: 2, stick: 2 }, durability: 50 },
+        { match: /\b(shop|store|market)\b/i, name: "Shop", category: null, costs: { wood: 10, "stone chunk": 5 } },
+        { match: /\b(house|home|hut|building|tower|castle)\b/i, name: "House", category: null, costs: { wood: 6, "stone chunk": 4 } },
+        { match: /\b(arrows?)\b/i, name: "Arrows", category: "ammunition", costs: { stick: 1, stone: 1 }, amount: 5 },
         { match: /\b(bullets?|ammunition|ammo)\b/i, name: "Bullets", category: "ammunition", costs: { metal: 1, gunpowder: 1 }, amount: 5 }
       ];
       const creaturePriorities = [
@@ -1460,11 +1484,16 @@
       }
 
       function traitModifier(entity, stat) {
-        return (entity.traits || []).reduce((total, name) => {
+        const traitTotal = (entity.traits || []).reduce((total, name) => {
           const trait = getTrait(name);
           if (!trait || trait.stat !== stat) return total;
           return total + (entity.traitModifiers?.[name] ?? (counterTraits.includes(trait) ? -2 : 2));
         }, 0);
+        return traitTotal + (entity.skillPoints?.[stat] || 0);
+      }
+
+      function statScore(entity, stat) {
+        return 10 + traitModifier(entity, stat);
       }
 
       function traitHpModifier(traits) {
@@ -1502,13 +1531,40 @@
         };
       }
 
+      function creatureSpawnLocation(creator, spawnMode) {
+        if (spawnMode !== "nearby" || !creator?.location) return randomLocation();
+        const angle = Math.random() * Math.PI * 2;
+        const distance = Math.random() * 2;
+        return {
+          x: Math.max(0, Math.min(state.worldWidth, creator.location.x + Math.cos(angle) * distance)),
+          y: Math.max(0, Math.min(state.worldHeight, creator.location.y + Math.sin(angle) * distance))
+        };
+      }
+
       function distanceBetween(first, second) {
         return Math.hypot(first.location.x - second.location.x, first.location.y - second.location.y);
       }
 
+      function mapSquare(entity) {
+        return {
+          x: Math.floor(entity.location.x / MAP_SQUARE_KM),
+          y: Math.floor(entity.location.y / MAP_SQUARE_KM)
+        };
+      }
+
+      function distanceInSquares(first, second) {
+        const firstSquare = mapSquare(first);
+        const secondSquare = mapSquare(second);
+        return Math.max(Math.abs(firstSquare.x - secondSquare.x), Math.abs(firstSquare.y - secondSquare.y));
+      }
+
+      function sameMapSquare(first, second) {
+        return distanceInSquares(first, second) === 0;
+      }
+
       function describeTravelDistance(distance) {
-        const km = Math.ceil(distance);
-        return `${km} km away · ${km} walking turns · ${Math.ceil(km / 3)} running turns · ${Math.ceil(km / 10)}–${Math.ceil(km / 5)} sprinting turns`;
+        const distanceText = distance < 1 ? `${Math.round(distance * 1000)} m` : `${distance.toFixed(1)} km`;
+        return `${distanceText} away · ${Math.ceil(distance)} walking turns · ${Math.ceil(distance / 3)} running turns · ${Math.ceil(distance / 10)}–${Math.ceil(distance / 5)} sprinting turns`;
       }
 
       function findRecipe(description) {
@@ -1766,7 +1822,7 @@
       }
 
       function itemCategory(item) {
-        if (item.category === "weapon" || item.category === "armor" || item.category === "food") return item.category;
+        if (item.category === "weapon" || item.category === "armor" || item.category === "food" || item.category === "tool") return item.category;
         const description = `${item.name} ${item.type}`;
         if (/\b(armor|armour|shield|helmet|breastplate)\b/i.test(description)) return "armor";
         if (/\b(weapon|knife|sword|dagger|axe|bow|spear)\b/i.test(description)) return "weapon";
@@ -2254,7 +2310,8 @@
             statName.textContent = label;
             const statValue = document.createElement("span");
             statValue.className = "entity-trait-value";
-            statValue.textContent = modifier > 0 ? `+${modifier}` : String(modifier);
+            const trained = entity.skillPoints?.[stat] || 0;
+            statValue.textContent = `${modifier > 0 ? `+${modifier}` : modifier}${trained ? ` (${trained > 0 ? "+" : ""}${trained} trained)` : ""}`;
             statLabel.appendChild(statName);
             statLabel.appendChild(statValue);
 
@@ -2619,12 +2676,32 @@
         for (let y = 0; y <= state.worldHeight; y += 500) {
           gridLines.push(`<line class="world-map-grid" x1="0" y1="${y}" x2="${state.worldWidth}" y2="${y}"></line>`);
         }
+        const forests = [[13, 12], [16, 13], [18, 11], [14, 16], [19, 16], [23, 14], [26, 16], [70, 29], [73, 31], [76, 28], [79, 33], [75, 36], [82, 30]];
+        const forestMarks = forests.map(([x, y]) => `<g transform="translate(${x} ${y})" fill="#236044" stroke="#d7d49a" stroke-width="0.08"><path d="M0 -1 L-0.7 0.15 H-0.35 L-0.85 0.9 H-0.2 V1.35 H0.2 V0.9 H0.85 L0.35 0.15 H0.7 Z"></path></g>`).join("");
+        const terrain = `
+          <rect width="90" height="50" fill="#397c94"></rect>
+          <path class="map-shore" d="M0 4 L5 3 9 5 14 3 18 4 21 7 27 6 31 9 36 8 40 11 43 10 47 14 46 18 49 21 46 25 48 29 44 32 46 36 43 40 39 41 36 45 31 44 28 47 23 45 18 47 14 44 10 45 8 41 4 40 2 36 0 35 Z"></path>
+          <path class="map-shore" d="M53 3 L58 4 61 7 66 6 70 8 75 7 79 10 85 9 89 13 90 17 87 20 89 24 85 27 86 32 82 34 80 39 76 38 72 42 67 40 63 43 58 41 56 37 52 36 54 31 51 27 54 23 52 18 55 15 52 11 Z"></path>
+          <path class="map-shore" d="M37 2 L40 1 43 3 42 6 39 7 36 5 Z"></path>
+          <path class="map-shore" d="M3 45 L8 43 12 45 11 48 7 49 3 48 Z"></path>
+          <path class="map-river" d="M14 7 C18 11 20 14 19 18 S24 24 22 29 27 35 26 42"></path>
+          <path class="map-river" d="M63 9 C60 13 64 16 61 20 S66 26 64 30 70 35 68 39"></path>
+          <path class="map-river" d="M32 16 C35 19 38 19 40 22 S43 27 47 29"></path>
+          <path d="M29 9 L32 6 35 9 38 5 41 8 44 6 47 10 43 12 39 10 35 12 Z" fill="#8f9a88" stroke="#5b665a" stroke-width="0.25"></path>
+          <path d="M28 8 L32 6 35 9 M38 7 L41 8 44 6" fill="none" stroke="#e4e1cf" stroke-width="0.18"></path>
+          <path d="M7 31 C12 29 17 30 21 33 M69 13 C73 12 78 13 82 16" fill="none" stroke="#c4a66a" stroke-width="0.18" stroke-dasharray="0.7 0.35"></path>
+          <ellipse cx="34" cy="34" rx="4.5" ry="2.3" fill="#5db7d0" stroke="#d7d49a" stroke-width="0.25"></ellipse>
+          <text class="map-terrain-label" x="10" y="28">PINEWOOD</text>
+          <text class="map-terrain-label" x="62" y="23">EASTERN FOREST</text>
+          <text class="map-terrain-label" x="30" y="39">MIRROR LAKE</text>
+          <text x="4" y="6" font-size="1.5" fill="#e6f4f1">N ↑</text>
+        `;
         const markers = state.entities.map((entity) => {
-          const x = Math.round(entity.location.x);
-          const y = Math.round(entity.location.y);
-          return `<g><title>${escapeHtml(entity.name)} — ${escapeHtml(entity.type)}</title><circle cx="${x}" cy="${y}" r="48" fill="${entity.isPlayer ? "#22c1ff" : "#8b5cf6"}" stroke="#edf3ff" stroke-width="8"></circle><text x="${x}" y="${y + 14}" text-anchor="middle" font-size="54">${escapeHtml(entity.icon || "✨")}</text><text class="world-map-label" x="${x + 60}" y="${y - 12}">${escapeHtml(entity.name)}</text></g>`;
+          const x = entity.location.x;
+          const y = entity.location.y;
+          return `<g><title>${escapeHtml(entity.name)} — ${escapeHtml(entity.type)} (${Math.floor(x / MAP_SQUARE_KM)}, ${Math.floor(y / MAP_SQUARE_KM)} grid square)</title><circle cx="${x}" cy="${y}" r="45" fill="${entity.isPlayer ? "#22c1ff" : "#8b5cf6"}" stroke="#edf3ff" stroke-width="8"></circle><text x="${x}" y="${y + 20}" text-anchor="middle" font-size="72">${escapeHtml(entity.icon || "✨")}</text><text class="world-map-label" x="${x + 60}" y="${y - 12}">${escapeHtml(entity.name)}</text></g>`;
         }).join("");
-        elements.worldMap.innerHTML = `<rect width="${state.worldWidth}" height="${state.worldHeight}" fill="#10213a"></rect>${gridLines.join("")}${markers}`;
+        elements.worldMap.innerHTML = `<rect width="${state.worldWidth}" height="${state.worldHeight}" fill="#397c94"></rect><g transform="scale(100)">${terrain}${forestMarks}</g>${gridLines.join("")}${markers}`;
       }
 
       function toggleEquipment(entity, item) {
@@ -2816,6 +2893,8 @@
           age: entityInput.age || null,
           location: entityInput.location || randomLocation(),
           resources: entityInput.resources || {},
+          skillPoints: entityInput.skillPoints || {},
+          knownRecipes: entityInput.knownRecipes || [],
           hatedKinds: parseHatedKinds(description),
           humanForm: Boolean(entityInput.humanForm),
           description,
@@ -2880,6 +2959,8 @@
           age: playerDetails.age,
           location: randomLocation(),
           resources: {},
+          skillPoints: {},
+          knownRecipes: [],
           hatedKinds: parseHatedKinds(description),
           humanForm: false,
           traits,
@@ -2959,6 +3040,7 @@
           gender: elements.beingGender.value,
           sexuality: elements.beingSexuality.value,
           humanForm: elements.beingHumanForm.checked,
+          location: creatureSpawnLocation(creator, elements.beingSpawnLocation.value),
           traits,
           traitModifiers: modifiers
         }, true);
@@ -2973,6 +3055,7 @@
         updateSexualityOptions(elements.beingGender, elements.beingSexuality);
         updateCreatureIcon();
         elements.beingDescription.value = "";
+        elements.beingSpawnLocation.value = "random";
         elements.beingPriorityMode.value = "random";
         elements.beingPriorityLabel.hidden = true;
         elements.beingName.focus();
@@ -2994,7 +3077,15 @@
         const builder = state.entities.find((entity) => entity.id === actorId);
         const recipe = findRecipe(`${name} ${type}`);
         if (!recipe) {
-          elements.objectRecipeInfo.textContent = "No recipe found. Try a wooden knife, stone knife, iron knife, gun, leather armor, iron armor, wooden shield, shop, house, or bullets.";
+          elements.objectRecipeInfo.textContent = "No recipe found. Try a shop or house. Weapons and tools must be crafted during an action.";
+          return;
+        }
+        if (["weapon", "tool", "ammunition"].includes(recipe.category)) {
+          elements.objectRecipeInfo.textContent = `${recipe.name} must be crafted during a turn, not made from the end-of-turn creation choice.`;
+          return;
+        }
+        if (recipe.category === null && (!builder || !hasHammer(builder))) {
+          elements.objectRecipeInfo.textContent = "Building a shop or house requires a hammer in your inventory.";
           return;
         }
         if (!builder || !hasResources(builder, recipe.costs)) {
@@ -3007,20 +3098,6 @@
           return;
         }
         consumeResources(builder, recipe.costs);
-        if (recipe.category === "ammunition") {
-          addResource(builder, "bullets", recipe.amount);
-          addLog(`<strong>${escapeHtml(builder.name)}</strong> crafts ${recipe.amount} bullets.`);
-          elements.objectForm.reset();
-          elements.objectSize.value = "small";
-          document.getElementById("objectCategoryLabel").hidden = false;
-          elements.objectCategory.value = "weapon";
-          elements.objectInInventory.checked = false;
-          elements.objectInInventory.disabled = false;
-          elements.objectIcon.value = "📦";
-          elements.objectRecipeInfo.textContent = "";
-          completeTurnCreation(actorId);
-          return;
-        }
         const object = {
           id: makeId(),
           name: recipe.name,
@@ -3033,20 +3110,24 @@
           maxDurability: recipe.durability || null,
           lastDurabilityDay: recipe.durability ? state.day : null
         };
+        if (object.size === "large") {
+          beginConstruction(builder, recipe);
+          elements.objectForm.reset();
+          elements.objectSize.value = "small";
+          document.getElementById("objectCategoryLabel").hidden = false;
+          elements.objectCategory.value = "weapon";
+          elements.objectInInventory.checked = false;
+          elements.objectInInventory.disabled = false;
+          elements.objectIcon.value = "📦";
+          elements.objectRecipeInfo.textContent = "";
+          completeTurnCreation(actorId);
+          return;
+        }
         if (object.size === "small") state.objects.push(object);
         if (object.size === "small" && elements.objectInInventory.checked) {
           if (builder) builder.inventory.push(object.id);
         }
-        const constructionTurns = object.size === "large" ? Math.floor(Math.random() * 5) + 1 : 0;
-        if (constructionTurns) {
-          if (builder) {
-            builder.busyTurns = constructionTurns;
-            builder.construction = object;
-          }
-        }
-        addLog(object.size === "large"
-          ? `<strong>${escapeHtml(name)}</strong> begins construction (${escapeHtml(type)}). It will take ${constructionTurns} turn${constructionTurns === 1 ? "" : "s"}.`
-          : `<strong>${escapeHtml(name)}</strong> is created as an object (${escapeHtml(type)}).${builder?.inventory.includes(object.id) ? ` It is added to ${escapeHtml(builder.name)}'s inventory.` : ""}`);
+        addLog(`<strong>${escapeHtml(name)}</strong> is created as an object (${escapeHtml(type)}).${builder?.inventory.includes(object.id) ? ` It is added to ${escapeHtml(builder.name)}'s inventory.` : ""}`);
         elements.objectForm.reset();
         elements.objectSize.value = "small";
         document.getElementById("objectCategoryLabel").hidden = false;
@@ -3069,29 +3150,36 @@
         }
         const isLarge = recipe.category === null;
         elements.objectSize.value = isLarge ? "large" : "small";
-        document.getElementById("objectCategoryLabel").hidden = isLarge || recipe.category === "ammunition";
-        elements.objectInInventory.disabled = isLarge || recipe.category === "ammunition";
+        const actionCrafted = ["weapon", "tool", "ammunition"].includes(recipe.category);
+        document.getElementById("objectCategoryLabel").hidden = isLarge || actionCrafted;
+        elements.objectInInventory.disabled = isLarge || actionCrafted;
         if (recipe.category === "armor" || recipe.category === "weapon") elements.objectCategory.value = recipe.category;
         if (elements.objectInInventory.disabled) elements.objectInInventory.checked = false;
       }
 
       function createCraftedItem(entity, recipe, description = "") {
         if (recipe.category === "ammunition") {
-          addResource(entity, "bullets", recipe.amount);
-          addLog(`<strong>${escapeHtml(entity.name)}</strong> crafts ${recipe.amount} bullets.`);
+          const ammunition = recipe.name.toLowerCase();
+          addResource(entity, ammunition, recipe.amount);
+          addLog(`<strong>${escapeHtml(entity.name)}</strong> crafts ${recipe.amount} ${resourceNames[ammunition]}.`);
           return true;
         }
+        const icon = recipe.category === "weapon"
+          ? recipe.name === "Gun" ? "🔫" : recipe.name === "Bow" ? "🏹" : "🔪"
+          : recipe.category === "armor" ? "🛡️" : "🛠️";
         const item = {
           id: makeId(),
           name: recipe.name,
           type: recipe.name,
-          icon: recipe.name === "Gun" ? "🔫" : recipe.category === "weapon" ? "🔪" : "🛡️",
+          icon,
           description: description || `Crafted by ${entity.name}.`,
           size: "small",
           category: recipe.category,
           durability: recipe.durability,
           maxDurability: recipe.durability,
-          lastDurabilityDay: state.day
+          lastDurabilityDay: state.day,
+          range: recipe.range || 0,
+          ammo: recipe.ammo || null
         };
         state.objects.push(item);
         entity.inventory.push(item.id);
@@ -3102,20 +3190,32 @@
       }
 
       function resourceForage(actionText, actor, skipCreation = true) {
-        const target = actionText.match(/\b(?:search(?:\s+for)?|look\s+for|gather|collect)\s+(?:some\s+)?(resources?|sticks?|wood|stone|iron|metal|sand|leather)\b/i);
+        const target = actionText.match(/\b(?:search(?:\s+for)?|look\s+for|gather|collect|mine|chop)\s+(?:some\s+)?(resources?|sticks?|string|strings|wood|stone chunks?|stones?|iron|metal|sand|leather)\b/i);
         const requested = target?.[1]?.toLowerCase();
-        const resource = requested === "sticks" ? "stick" : requested === "iron" ? "metal" : requested;
-        const usesStrength = !resource || /^resources?$/i.test(resource) || ["wood", "stone", "metal"].includes(resource);
-        const roll = rollD20(actor, usesStrength ? "strength" : "survival");
+        const miningStone = /\bmine\b/i.test(actionText) && requested?.startsWith("stone");
+        const resource = requested === "sticks" ? "stick"
+          : requested === "strings" ? "string"
+            : requested === "iron" ? "metal"
+              : requested?.startsWith("stone chunk") || miningStone ? "stone chunk"
+                : requested?.startsWith("stone") ? "stone" : requested;
+        const genericSearch = !target || /^resources?$/i.test(requested);
+        const requiresAxe = resource === "wood";
+        const requiresPickaxe = resource === "stone chunk" || resource === "metal";
+        const toolName = requiresAxe ? "Axe" : "Pickaxe";
+        const tool = requiresAxe || requiresPickaxe ? findUsableTool(actor, toolName) : null;
+        const canGatherBarehanded = !requiresAxe && !requiresPickaxe || statScore(actor, "strength") >= 15;
+        const roll = rollD20(actor, genericSearch || (!requiresAxe && !requiresPickaxe) || tool ? "survival" : "strength");
         actor.turnUsed = true;
-        if (!target || /^resources?$/i.test(target[1])) {
+        if (genericSearch) {
           if (roll < 6) {
             addLog(`<strong>${escapeHtml(actor.name)}</strong> searches for resources but finds nothing (d20: ${roll}).`);
           } else {
-            const options = roll >= 10
-              ? resourceSearchOptions
-              : resourceSearchOptions.filter((resource) => !["wood", "stone", "metal"].includes(resource));
-            const found = [randomFrom(options), randomFrom(options)];
+            const available = [...resourceSearchOptions];
+            const found = [];
+            while (found.length < 2) {
+              const index = Math.floor(Math.random() * available.length);
+              found.push(available.splice(index, 1)[0]);
+            }
             found.forEach((resource) => addResource(actor, resource));
             addLog(`<strong>${escapeHtml(actor.name)}</strong> finds ${found.map((resource) => resourceNames[resource]).join(" and ")} (d20: ${roll}).`);
           }
@@ -3123,27 +3223,171 @@
           return;
         }
 
-        if (resource === "leather") {
-          addLog("Leather must be recovered from a defeated animal with a hide; searching cannot produce it.");
-        } else if ((resource === "wood" || resource === "stone" || resource === "metal") && roll < 10) {
-          addLog(`<strong>${escapeHtml(actor.name)}</strong> needs a Strength check of 10+ to gather ${resourceNames[resource]} (d20: ${roll}).`);
+        if ((requiresAxe || requiresPickaxe) && !tool && !canGatherBarehanded) {
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> needs Strength 15 or a usable ${toolName.toLowerCase()} to gather ${resourceNames[resource]}.`);
         } else if (roll < 6) {
           addLog(`<strong>${escapeHtml(actor.name)}</strong> searches for ${resourceNames[resource]} but finds none (d20: ${roll}).`);
         } else {
           addResource(actor, resource);
-          addLog(`<strong>${escapeHtml(actor.name)}</strong> finds 1 ${resourceNames[resource]} (d20: ${roll}).`);
+          if (tool) wearItem(actor, tool);
+          const verb = requiresAxe ? "chops" : requiresPickaxe ? "mines" : "finds";
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> ${verb} 1 ${resourceNames[resource]} (d20: ${roll}).`);
         }
         finishActorTurn(actor, skipCreation);
       }
 
       function isResourceAction(actionText) {
-        return /\b(search|look for|gather|collect)\b.*\b(resources?|sticks?|wood|stone|iron|metal|sand|leather)\b/i.test(actionText);
+        return /\b(search|look for|gather|collect|mine|chop)\b.*\b(resources?|sticks?|string|strings|wood|stone|iron|metal|sand|leather)\b/i.test(actionText);
+      }
+
+      function findUsableTool(entity, toolName) {
+        return state.objects.find((item) => entity.inventory.includes(item.id)
+          && item.name.toLowerCase() === toolName.toLowerCase()
+          && getObjectDurability(item) > 0);
+      }
+
+      function hasHammer(entity) {
+        return Boolean(entity && findUsableTool(entity, "Hammer"));
+      }
+
+      function beginConstruction(entity, recipe) {
+        const construction = {
+          id: makeId(),
+          name: recipe.name,
+          type: recipe.name,
+          icon: recipe.name === "Shop" ? "🏪" : "🏠",
+          size: "large",
+          description: `Built by ${entity.name}.`
+        };
+        entity.busyTurns = Math.floor(Math.random() * 5) + 1;
+        entity.construction = construction;
+        const hammer = findUsableTool(entity, "Hammer");
+        if (hammer) wearItem(entity, hammer);
+        addLog(`<strong>${escapeHtml(entity.name)}</strong> starts building a ${escapeHtml(recipe.name)} with a hammer. It will take ${entity.busyTurns} turns.`);
+      }
+
+      function aiBuildingTurn(actor) {
+        const structure = ["trading", "selling"].includes(actor.priority)
+          ? findRecipe("Shop")
+          : findRecipe("House");
+        const missingToolRecipe = (toolName) => findRecipe(toolName);
+        const gatherSmallMaterials = () => resourceForage("search resources", actor);
+
+        if (!hasHammer(actor)) {
+          const hammerRecipe = missingToolRecipe("Hammer");
+          if (hasResources(actor, hammerRecipe.costs)) craftAction("craft Hammer", actor);
+          else gatherSmallMaterials();
+          return;
+        }
+
+        if ((actor.resources.wood || 0) < structure.costs.wood) {
+          if (!findUsableTool(actor, "Axe") && statScore(actor, "strength") < 15) {
+            const axeRecipe = missingToolRecipe("Axe");
+            if (hasResources(actor, axeRecipe.costs)) craftAction("craft Axe", actor);
+            else gatherSmallMaterials();
+          } else {
+            resourceForage("chop wood", actor);
+          }
+          return;
+        }
+
+        if ((actor.resources["stone chunk"] || 0) < structure.costs["stone chunk"]) {
+          if (!findUsableTool(actor, "Pickaxe") && statScore(actor, "strength") < 15) {
+            const pickaxeRecipe = missingToolRecipe("Pickaxe");
+            if (hasResources(actor, pickaxeRecipe.costs)) craftAction("craft Pickaxe", actor);
+            else gatherSmallMaterials();
+          } else {
+            resourceForage("mine stone chunks", actor);
+          }
+          return;
+        }
+
+        consumeResources(actor, structure.costs);
+        actor.turnUsed = true;
+        beginConstruction(actor, structure);
+        finishActorTurn(actor, true);
+      }
+
+      function aiCraftingTurn(actor) {
+        const craftable = itemRecipes.filter((recipe) =>
+          ["weapon", "armor", "tool", "ammunition"].includes(recipe.category)
+          && !recipe.blueprintRequired
+          && hasResources(actor, recipe.costs)
+        );
+        if (craftable.length) {
+          const recipe = randomFrom(craftable);
+          craftAction(`craft ${recipe.name}`, actor);
+          return;
+        }
+        resourceForage("search resources", actor);
+      }
+
+      function learnRecipeAction(actionText, actor) {
+        const match = actionText.match(/\blearn\s+(?:the\s+)?(?:recipe\s+for\s+)?(.+?)\s*$/i);
+        if (!match) return false;
+        const recipe = findRecipe(match[1]);
+        if (!recipe || !recipe.blueprintRequired) {
+          addLog("There is no special blueprint to learn for that item.");
+          render();
+          return true;
+        }
+        actor.knownRecipes ||= [];
+        if (actor.knownRecipes.includes(recipe.name)) {
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> already knows the recipe for ${escapeHtml(recipe.name)}.`);
+          render();
+          return true;
+        }
+        const roll = rollD20(actor, "intelligence");
+        actor.turnUsed = true;
+        if (roll >= 10) {
+          actor.knownRecipes.push(recipe.name);
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> learns the recipe for ${escapeHtml(recipe.name)} (${roll}/20). ${formatRecipe(recipe)} Gather the materials and spend another turn crafting it.`);
+        } else {
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> fails to learn the recipe for ${escapeHtml(recipe.name)} (needs 10+, rolled ${roll}).`);
+        }
+        finishActorTurn(actor, true);
+        return true;
+      }
+
+      function trainAction(actionText, actor) {
+        const match = actionText.match(/\btrain\s+(strength|intelligence|charisma|agility|courage|perception|dexterity|vitality|presence|luck|survival|wisdom)\b/i);
+        if (!match) {
+          addLog("Choose a stat to train, such as “train strength” or “train perception”.");
+          render();
+          return true;
+        }
+        const stat = match[1].toLowerCase();
+        const roll = rollD20(actor, stat);
+        actor.turnUsed = true;
+        actor.skillPoints ||= {};
+        if (roll <= 6) {
+          actor.skillPoints[stat] = (actor.skillPoints[stat] || 0) - 1;
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> critically fails training ${stat} (d20: ${roll}) and loses 1 skill point. Training modifier: ${traitModifier(actor, stat) >= 0 ? "+" : ""}${traitModifier(actor, stat)}.`);
+        } else if (roll <= 18) {
+          actor.skillPoints[stat] = (actor.skillPoints[stat] || 0) + 2;
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> trains ${stat} (d20: ${roll}) and gains 2 skill points. Training modifier: ${traitModifier(actor, stat) >= 0 ? "+" : ""}${traitModifier(actor, stat)}.`);
+        } else {
+          actor.skillPoints[stat] = (actor.skillPoints[stat] || 0) + 5;
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> excels at training ${stat} (d20: ${roll}) and gains 5 skill points. Training modifier: ${traitModifier(actor, stat) >= 0 ? "+" : ""}${traitModifier(actor, stat)}.`);
+        }
+        finishActorTurn(actor, true);
+        return true;
       }
 
       function craftAction(actionText, actor, skipCreation = true) {
         const recipe = findRecipe(actionText);
         if (!recipe) {
           addLog(`No recipe found for that item. ${formatRecipe(null)}`);
+          render();
+          return false;
+        }
+        if (recipe.blueprintRequired && !(actor.knownRecipes || []).includes(recipe.name)) {
+          addLog(`You need to spend a turn learning the recipe for ${recipe.name} before crafting it.`);
+          render();
+          return false;
+        }
+        if (recipe.category === null && !hasHammer(actor)) {
+          addLog(`Building ${recipe.name} requires a usable hammer in your inventory.`);
           render();
           return false;
         }
@@ -3158,7 +3402,8 @@
           addLog(`<strong>${escapeHtml(actor.name)}</strong> fails the crafting check for ${escapeHtml(recipe.name)} (needs 10+, rolled ${roll}). The materials are not used.`);
         } else {
           consumeResources(actor, recipe.costs);
-          createCraftedItem(actor, recipe);
+          if (recipe.category === null) beginConstruction(actor, recipe);
+          else createCraftedItem(actor, recipe);
           addLog(`<strong>${escapeHtml(actor.name)}</strong> succeeds at crafting (${roll}/20).`);
         }
         finishActorTurn(actor, skipCreation);
@@ -3216,6 +3461,11 @@
           render();
           return true;
         }
+        if (recipe.blueprintRequired && !(actor.knownRecipes || []).includes(recipe.name)) {
+          addLog(`You need to learn the recipe for ${recipe.name} before upgrading to it.`);
+          render();
+          return true;
+        }
         const roll = rollD20(actor, "dexterity");
         actor.turnUsed = true;
         if (roll < 10) {
@@ -3228,6 +3478,8 @@
           item.category = recipe.category;
           item.maxDurability = recipe.durability;
           item.durability = Math.min(recipe.durability, getObjectDurability(item));
+          item.range = recipe.range || 0;
+          item.ammo = recipe.ammo || null;
           if (item.category === "weapon") actor.equippedWeaponId = item.id;
           if (item.category === "armor") actor.equippedArmorId = item.id;
           addLog(`<strong>${escapeHtml(actor.name)}</strong> upgrades ${escapeHtml(oldName)} to ${escapeHtml(item.name)} (${roll}/20).`);
@@ -3294,11 +3546,11 @@
         let createCreature = !objectPriority && Math.random() < 0.5;
         let objectRecipe = null;
         if (!createCreature) {
-          let recipes = itemRecipes.filter((recipe) => recipe.category !== "ammunition");
-          if (actor.priority === "building") recipes = recipes.filter((recipe) => recipe.category === null);
-          else if (["trading", "selling"].includes(actor.priority)) recipes = recipes.filter((recipe) => /\b(shop|store|market)\b/i.test(recipe.name));
-          else if (actor.priority === "crafting") recipes = recipes.filter((recipe) => recipe.category === "weapon" || recipe.category === "armor");
-          else recipes = recipes.filter((recipe) => recipe.category !== null);
+          const recipes = itemRecipes.filter((recipe) =>
+            recipe.category === null
+            && hasHammer(actor)
+            && (actor.priority !== "trading" && actor.priority !== "selling" || recipe.name === "Shop")
+          );
           objectRecipe = randomFrom(recipes.filter((recipe) => hasResources(actor, recipe.costs))) || null;
           if (!objectRecipe) {
             addLog(`<strong>${escapeHtml(actor.name)}</strong> does not have the resources for a creation and will create a creature instead.`);
@@ -3321,22 +3573,7 @@
           }, true);
         } else {
           consumeResources(actor, objectRecipe.costs);
-          if (objectRecipe.category !== null) {
-            createCraftedItem(actor, objectRecipe);
-          } else {
-            const createdObject = {
-              id: makeId(),
-              name: objectRecipe.name,
-              type: objectRecipe.name,
-              icon: "🏠",
-              size: "large",
-              description: `Created by ${actor.name} at the end of their turn.`
-            };
-            const constructionTurns = Math.floor(Math.random() * 5) + 1;
-            actor.busyTurns = constructionTurns;
-            actor.construction = createdObject;
-            addLog(`<strong>${escapeHtml(objectRecipe.name)}</strong> begins construction by ${escapeHtml(actor.name)} and will take ${constructionTurns} turns.`);
-          }
+          beginConstruction(actor, objectRecipe);
         }
 
         advanceTurn();
@@ -3434,7 +3671,23 @@
       }
 
       function isAttackAction(actionText) {
-        return /\b(attack|attacks|hit|hits|strike|strikes|kill|kills|fight|fights)\b/i.test(actionText);
+        return /\b(attack|attacks|hit|hits|strike|strikes|kill|kills|fight|fights|throw|throws)\b/i.test(actionText);
+      }
+
+      function findThrownWeapon(actor, actionText) {
+        const throwText = actionText.match(/\bthrow\s+(.+?)(?:\s+at\s+|$)/i)?.[1]?.toLowerCase() || "";
+        const requestedWords = throwText.match(/[\p{L}\p{N}]+/gu) || [];
+        const carriedWeapons = state.objects.filter((item) =>
+          actor.inventory.includes(item.id) && itemCategory(item) === "weapon" && getObjectDurability(item) > 0
+        );
+        const matchingWeapons = carriedWeapons.filter((item) => {
+          const isLongRange = item.range > 0 || Boolean(item.ammo);
+          if (isLongRange && actor.equippedWeaponId !== item.id) return false;
+          if (!requestedWords.length || requestedWords.includes("weapon") || requestedWords.includes("item")) return true;
+          const nameWords = item.name.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
+          return nameWords.every((word) => requestedWords.includes(word));
+        });
+        return matchingWeapons[0] || null;
       }
 
       function findTravelTarget(actionText, actor) {
@@ -3503,6 +3756,7 @@
       function wearItemsForNewDay() {
         [...state.objects].forEach((item) => {
           if (item.durability === null || item.durability === undefined) return;
+          if (itemCategory(item) === "tool") return;
           const lastDurabilityDay = item.lastDurabilityDay ?? state.day;
           if (state.day - lastDurabilityDay < 3) return;
           item.lastDurabilityDay = state.day;
@@ -3534,41 +3788,71 @@
         return actualDamage;
       }
 
-      function resolveAttack(attacker, target) {
-        const weapon = state.objects.find((item) => item.id === attacker.equippedWeaponId
+      function resolveAttack(attacker, target, options = {}) {
+        const weapon = options.weapon || state.objects.find((item) => item.id === attacker.equippedWeaponId
           && attacker.inventory.includes(item.id) && itemCategory(item) === "weapon" && getObjectDurability(item) > 0);
-        const usesBullets = Boolean(weapon && /\b(gun|pistol|rifle)\b/i.test(`${weapon.name} ${weapon.type}`));
-        if (usesBullets && !(attacker.resources.bullets > 0)) {
-          addLog(`<strong>${escapeHtml(attacker.name)}</strong> cannot fire ${escapeHtml(weapon.name)} without bullets.`);
+        const thrown = Boolean(options.thrown);
+        const distance = distanceInSquares(attacker, target);
+        const longRange = Boolean(weapon && (weapon.range > 0 || weapon.ammo));
+        if (thrown) {
+          const minimumDistance = longRange ? 4 : 2;
+          if (!weapon || distance < minimumDistance || distance > 100) {
+            addLog(`A ${longRange ? "long-range weapon" : "thrown weapon"} can only be thrown from ${minimumDistance} to 100 grid squares away.`);
+            return false;
+          }
+        } else if (longRange) {
+          if (distance > (weapon.range || 2)) {
+            addLog(`${escapeHtml(weapon.name)} can attack only from the same square or up to ${weapon.range || 2} squares away. Throw it to attempt a longer shot.`);
+            return false;
+          }
+        } else if (distance > 0) {
+          addLog(`You must be in the same 500-meter map square as ${escapeHtml(target.name)} to attack with a melee weapon.`);
           return false;
         }
-        if (usesBullets) {
-          attacker.resources.bullets -= 1;
-          if (attacker.resources.bullets <= 0) delete attacker.resources.bullets;
+
+        const ammo = weapon?.ammo;
+        if (longRange && !(attacker.resources?.[ammo] > 0)) {
+          addLog(`<strong>${escapeHtml(attacker.name)}</strong> cannot use ${escapeHtml(weapon.name)} without ${resourceNames[ammo] || ammo}.`);
+          return false;
+        }
+        if (longRange) {
+          attacker.resources[ammo] -= 1;
+          if (attacker.resources[ammo] <= 0) delete attacker.resources[ammo];
         }
         const roll = rollD20(attacker, "strength");
         const awarenessRoll = attacker.isPlayer ? rollD20(target, "perception") : null;
         const selfHitThreshold = weapon ? 3 : 7;
         const criticalThreshold = weapon ? 14 : 16;
+        const throwDistanceThreshold = thrown
+          ? Math.min(20, 11 + distance - (longRange ? 4 : 2))
+          : 1;
 
         if (roll <= selfHitThreshold) {
           const damage = Math.max(1, Math.ceil(attacker.maxHp * 0.1));
           addLog(`<strong>${escapeHtml(attacker.name)}</strong> rolls ${roll}/20 and misses ${escapeHtml(target.name)}, hurting themself instead.${weapon ? " The equipped weapon makes attacks risky only on 1–3." : ""}${awarenessRoll === null ? "" : ` Awareness roll: ${awarenessRoll}/20.`}`);
           applyDamage(attacker, damage, "hurts themself");
-          if (weapon) wearItem(attacker, weapon);
+          if (weapon && !thrown) wearItem(attacker, weapon);
+        } else if (thrown && roll < throwDistanceThreshold) {
+          addLog(`<strong>${escapeHtml(attacker.name)}</strong> throws ${escapeHtml(weapon.name)} toward ${escapeHtml(target.name)} from ${distance} squares but misses (needs ${throwDistanceThreshold}+; rolled ${roll}).`);
         } else {
           const critical = roll >= criticalThreshold;
           const baseDamage = Math.max(1, Math.ceil(target.maxHp * 0.1));
           const damage = baseDamage * (critical ? 3 : 1) * (weapon ? 2 : 1);
           const actualDamage = damageAfterArmor(target, damage);
-          addLog(`<strong>${escapeHtml(attacker.name)}</strong> rolls ${roll}/20 and ${critical ? "lands a critical hit on" : "hits"} <strong>${escapeHtml(target.name)}</strong> for ${actualDamage} damage${weapon ? ` with ${escapeHtml(weapon.name)}` : ""}.${awarenessRoll === null ? "" : ` Awareness roll: ${awarenessRoll}/20.`}`);
+          addLog(`<strong>${escapeHtml(attacker.name)}</strong> rolls ${roll}/20 and ${critical ? "lands a critical hit on" : "hits"} <strong>${escapeHtml(target.name)}</strong> for ${actualDamage} damage${weapon ? ` with ${escapeHtml(weapon.name)}` : ""}.${thrown ? ` The throw required ${throwDistanceThreshold}+ at ${distance} squares.` : ""}${awarenessRoll === null ? "" : ` Awareness roll: ${awarenessRoll}/20.`}`);
           applyDamage(target, actualDamage, critical ? "is critically hit" : "is hit", true);
           if (target.hp <= 0 && yieldsLeather(target)) {
             const leather = Math.floor(Math.random() * 3) + 1;
             addResource(attacker, "leather", leather);
             addLog(`<strong>${escapeHtml(attacker.name)}</strong> collects ${leather} leather from ${escapeHtml(target.name)}.`);
           }
-          if (weapon) wearItem(attacker, weapon);
+          if (weapon && !thrown) wearItem(attacker, weapon);
+        }
+        if (thrown && weapon) {
+          attacker.inventory = attacker.inventory.filter((itemId) => itemId !== weapon.id);
+          if (attacker.equippedWeaponId === weapon.id) attacker.equippedWeaponId = null;
+          state.objects = state.objects.filter((item) => item.id !== weapon.id);
+          addLog(`<strong>${escapeHtml(attacker.name)}</strong> loses ${escapeHtml(weapon.name)} after throwing it.`);
         }
 
         if (target.hp > 0 && awarenessRoll !== null && !isPassiveAnimal(target)) {
@@ -3612,16 +3896,25 @@
         const angle = distance > 0 ? null : Math.random() * Math.PI * 2;
         const directionX = distance > 0 ? (actor.location.x - target.location.x) / distance : Math.cos(angle);
         const directionY = distance > 0 ? (actor.location.y - target.location.y) / distance : Math.sin(angle);
-        const distanceToMove = Math.min(3, distance || 3);
+        const distanceToMove = Math.min(1.5, distance || 1.5);
         actor.location.x = Math.max(0, Math.min(state.worldWidth, actor.location.x + directionX * distanceToMove));
         actor.location.y = Math.max(0, Math.min(state.worldHeight, actor.location.y + directionY * distanceToMove));
+      }
+
+      function moveToward(actor, target, distanceToMove = 0.5) {
+        const distance = distanceBetween(actor, target);
+        if (distance === 0) return;
+        const traveled = Math.min(distanceToMove, distance);
+        const ratio = traveled / distance;
+        actor.location.x += (target.location.x - actor.location.x) * ratio;
+        actor.location.y += (target.location.y - actor.location.y) * ratio;
       }
 
       function findUsableWeapon(entity) {
         return state.objects.find((item) => entity.inventory.includes(item.id)
           && itemCategory(item) === "weapon"
           && getObjectDurability(item) > 0
-          && (!/\b(gun|pistol|rifle)\b/i.test(`${item.name} ${item.type}`) || entity.resources.bullets > 0));
+          && (!item.ammo || (entity.resources?.[item.ammo] || 0) > 0));
       }
 
       function findUsableArmor(entity) {
@@ -3636,8 +3929,8 @@
           const recipe = itemRecipes.find((itemRecipe) => itemRecipe.category === "weapon"
             && !/\b(gun|pistol|rifle)\b/i.test(itemRecipe.name)
             && hasResources(actor, itemRecipe.costs));
-          if (recipe) craftAction(`craft ${recipe.name}`, actor, false);
-          else resourceForage("search resources", actor, false);
+          if (recipe) craftAction(`craft ${recipe.name}`, actor);
+          else resourceForage("search resources", actor);
           return true;
         }
         actor.equippedWeaponId = weapon.id;
@@ -3647,8 +3940,8 @@
           actor.equippedArmorId = null;
           const recipe = itemRecipes.find((itemRecipe) => itemRecipe.category === "armor"
             && hasResources(actor, itemRecipe.costs));
-          if (recipe) craftAction(`craft ${recipe.name}`, actor, false);
-          else resourceForage("search resources", actor, false);
+          if (recipe) craftAction(`craft ${recipe.name}`, actor);
+          else resourceForage("search resources", actor);
           return true;
         }
         actor.equippedArmorId = armor.id;
@@ -3660,6 +3953,11 @@
       }
 
       function beginPickpocket(actor, target) {
+        if (!sameMapSquare(actor, target)) {
+          addLog(`You must be in the same 500-meter map square as ${escapeHtml(target.name)} to pickpocket them.`);
+          render();
+          return false;
+        }
         if (!target.inventory.length) {
           addLog(`<strong>${escapeHtml(target.name)}</strong> has nothing to pickpocket.`);
           render();
@@ -3668,6 +3966,7 @@
 
         state.pickpocket = { actorId: actor.id, targetId: target.id, mode: "choose", expiresAt: null };
         render();
+        return true;
       }
 
       function choosePickpocketRoll() {
@@ -3938,6 +4237,21 @@
           return;
         }
 
+        if (/^\s*train\b/i.test(actionText)) {
+          trainAction(actionText, actor);
+          elements.actionText.value = "";
+          render();
+          return;
+        }
+
+        if (/^\s*learn\b/i.test(actionText)) {
+          if (learnRecipeAction(actionText, actor)) {
+            elements.actionText.value = "";
+            render();
+          }
+          return;
+        }
+
         if (transformResourceAction(actionText, actor)) {
           elements.actionText.value = "";
           render();
@@ -3960,7 +4274,7 @@
           return;
         }
 
-        if (/\bcraft\b.*\b(knife|gun|pistol|rifle|armor|armour|shield|shop|store|market|house|home|hut|building|tower|castle|bullets?|ammo)\b/i.test(actionText)) {
+        if (/\b(craft|build)\b.*\b(knife|bow|arrows?|gun|pistol|rifle|armor|armour|shield|shop|store|market|house|home|hut|building|tower|castle|hammer|axe|pickaxe|bullets?|ammo)\b/i.test(actionText)) {
           if (craftAction(actionText, actor)) {
             elements.actionText.value = "";
             render();
@@ -3993,7 +4307,14 @@
             return;
           }
 
-          if (resolveAttack(actor, target) === false) {
+          const thrown = /\bthrow(?:s|ing)?\b/i.test(actionText);
+          const weapon = thrown ? findThrownWeapon(actor, actionText) : null;
+          if (thrown && !weapon) {
+            addLog("Choose a weapon in your inventory to throw. Long-range weapons must be equipped first.");
+            render();
+            return;
+          }
+          if (resolveAttack(actor, target, thrown ? { weapon, thrown: true } : {}) === false) {
             elements.actionText.value = "";
             render();
             return;
@@ -4005,6 +4326,11 @@
         }
 
         if (intent && target) {
+          if (!sameMapSquare(actor, target)) {
+            addLog(`You must be in the same 500-meter map square as ${escapeHtml(target.name)} to interact with them.`);
+            render();
+            return;
+          }
           actor.turnUsed = true;
           resolveSocialAction(actor, target, actionText, intent);
           elements.actionText.value = "";
@@ -4093,6 +4419,15 @@
         const hatedTarget = state.entities.find((entity) => actor.hostileTo.includes(entity.id) && entity.hp > 0);
         if (hatedTarget && !isPassiveAnimal(actor)) {
           if (prepareForHostility(actor)) return;
+          const weapon = findUsableWeapon(actor);
+          const attackRange = weapon?.range || 0;
+          if (distanceInSquares(actor, hatedTarget) > attackRange) {
+            moveToward(actor, hatedTarget);
+            actor.turnUsed = true;
+            addLog(`<strong>${escapeHtml(actor.name)}</strong> moves toward ${escapeHtml(hatedTarget.name)} to attack.`);
+            beginTurnCreation(actor);
+            return;
+          }
           actor.turnUsed = true;
           addLog(`<strong>${escapeHtml(actor.name)}</strong> seeks revenge and attacks ${escapeHtml(hatedTarget.name)}.`);
           resolveAttack(actor, hatedTarget);
@@ -4113,6 +4448,15 @@
         if (!isPassiveAnimal(actor) && ["combat", "murdering"].includes(actor.priority)) {
           const target = randomFrom(state.entities.filter((entity) => entity.id !== actor.id && entity.hp > 0));
           if (target) {
+            const weapon = findUsableWeapon(actor);
+            const attackRange = weapon?.range || 0;
+            if (distanceInSquares(actor, target) > attackRange) {
+              moveToward(actor, target);
+              actor.turnUsed = true;
+              addLog(`<strong>${escapeHtml(actor.name)}</strong> moves closer to ${escapeHtml(target.name)} to attack.`);
+              beginTurnCreation(actor);
+              return;
+            }
             actor.turnUsed = true;
             const action = actor.priority === "murdering" ? "pursues their serial-killer obsession and attacks" : "seeks combat and attacks";
             addLog(`<strong>${escapeHtml(actor.name)}</strong> ${action} <strong>${escapeHtml(target.name)}</strong>.`);
@@ -4127,11 +4471,22 @@
           return;
         }
 
-        if (["building", "crafting", "trading", "selling"].includes(actor.priority)) {
-          const resourceAction = actor.priority === "building"
-            ? `search for ${randomFrom(["wood", "stone"])}`
-            : "search resources";
-          resourceForage(resourceAction, actor, false);
+        if (["building", "trading", "selling"].includes(actor.priority)) {
+          aiBuildingTurn(actor);
+          return;
+        }
+
+        if (actor.priority === "crafting") {
+          aiCraftingTurn(actor);
+          return;
+        }
+
+        if (Math.random() < 0.08) {
+          const weakestStats = [...traitStats]
+            .sort((first, second) => traitModifier(actor, first[0]) - traitModifier(actor, second[0]))
+            .slice(0, 3)
+            .map(([stat]) => stat);
+          trainAction(`train ${randomFrom(weakestStats)}`, actor);
           return;
         }
 
@@ -4140,6 +4495,13 @@
         const shouldSeekSocial = socialPriorities.includes(actor.priority)
           || (!actor.priority && Math.random() < 0.35);
         if (socialTarget && shouldSeekSocial) {
+          if (!sameMapSquare(actor, socialTarget)) {
+            moveToward(actor, socialTarget);
+            actor.turnUsed = true;
+            addLog(`<strong>${escapeHtml(actor.name)}</strong> moves toward ${escapeHtml(socialTarget.name)} to talk.`);
+            beginTurnCreation(actor);
+            return;
+          }
           actor.turnUsed = true;
           const socialAction = {
             friendship: `says hello to ${socialTarget.name}`,
