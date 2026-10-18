@@ -1281,6 +1281,23 @@
         arrows: "Arrows",
         "throwing knives": "Throwing knives"
       };
+
+      function formatResourceAmount(resource, amount) {
+        const singularNames = {
+          stick: "Stick",
+          string: "String",
+          wood: "Wood",
+          stone: "Stone",
+          "stone chunk": "Stone chunk",
+          metal: "Metal ore",
+          "scrap metal": "Scrap metal",
+          sand: "Sand",
+          leather: "Leather",
+          gunpowder: "Gunpowder"
+        };
+        const name = amount === 1 ? singularNames[resource] || resourceNames[resource] : resourceNames[resource] || resource;
+        return `${amount} ${name}`;
+      }
       const resourceSearchOptions = ["stick", "stone", "string", "sand", "leather"];
       const itemRecipes = [
         { match: /\b(wooden knife|wood knife)\b/i, name: "Wooden Knife", category: "weapon", costs: { stick: 1 }, durability: 20 },
@@ -1588,6 +1605,13 @@
         return /\b(demons?|devils?)\b/i.test(entity?.type || "");
       }
 
+      function findDemonTarget(actionText) {
+        const namedDemon = findActionTarget(actionText);
+        if (namedDemon && isDemon(namedDemon)) return namedDemon;
+        if (!/\b(demon|devil)\b/i.test(actionText)) return null;
+        return state.entities.find((entity) => !entity.isPlayer && entity.hp > 0 && isDemon(entity)) || null;
+      }
+
       function teleportTo(entity, destination) {
         entity.location = { x: destination.location.x, y: destination.location.y };
       }
@@ -1599,9 +1623,11 @@
         elements.demonBargainTitle.textContent = `${demon.name} appears`;
         elements.demonBargainMessage.textContent = `${demon.name} has teleported to you. “What do you want?”`;
         elements.demonBargainRequest.value = "";
+        addLog(`<strong>${escapeHtml(demon.name)}</strong> teleports across the map to hear ${escapeHtml(actor.name)}'s trade request.`, demon);
+        render();
         if (!elements.demonBargainDialog.open) elements.demonBargainDialog.showModal();
         elements.demonBargainRequest.focus();
-        addLog(`<strong>${escapeHtml(demon.name)}</strong> teleports across the map to hear your trade request.`, demon);
+        scheduleAiTurn();
       }
 
       function grantDemonGift(actor, request) {
@@ -3346,7 +3372,7 @@
       }
 
       function resourceForage(actionText, actor, skipCreation = true) {
-        const target = actionText.match(/\b(?:search(?:\s+for)?|look\s+for|gather|collect|mine|chop)\s+(?:some\s+)?(resources?|sticks?|string|strings|wood|stone chunks?|stones?|iron|metal|sand|leather)\b/i);
+        const target = actionText.match(/\b(?:search(?:\s+for)?|look\s+for|gather|collect|mine|chop)\s+(?:some\s+)?(?:a\s+|an\s+)?(resources?|sticks?|string|strings|wood|stone chunks?|stones?|iron|metal|sand|leather)\b/i);
         const requested = target?.[1]?.toLowerCase();
         const miningStone = /\bmine\b/i.test(actionText) && requested?.startsWith("stone");
         const resource = requested === "sticks" ? "stick"
@@ -3387,13 +3413,13 @@
           addResource(actor, resource);
           if (tool) wearItem(actor, tool);
           const verb = requiresAxe ? "chops" : requiresPickaxe ? "mines" : "finds";
-          addLog(`<strong>${escapeHtml(actor.name)}</strong> ${verb} 1 ${resourceNames[resource]} (d20: ${roll}).`);
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> ${verb} ${formatResourceAmount(resource, 1)} (d20: ${roll}).`);
         }
         finishActorTurn(actor, skipCreation);
       }
 
       function isResourceAction(actionText) {
-        return /\b(search|look for|gather|collect|mine|chop)\b.*\b(resources?|sticks?|string|strings|wood|stone|iron|metal|sand|leather)\b/i.test(actionText);
+        return /\b(search|look for|gather|collect|mine|chop)\b.*\b(?:a\s+|an\s+)?(resources?|sticks?|string|strings|wood|stone(?:\s+chunks?)?|iron|metal|sand|leather)\b/i.test(actionText);
       }
 
       function findUsableTool(entity, toolName) {
@@ -4406,9 +4432,10 @@
         const target = findActionTarget(actionText);
         const intent = socialIntent(actionText);
 
-        if (/\b(trade|bargain|deal)\b/i.test(actionText) && target && isDemon(target)) {
+        const demonTarget = findDemonTarget(actionText);
+        if (/\b(trade|bargain|deal)\b/i.test(actionText) && demonTarget) {
           elements.actionText.value = "";
-          beginDemonBargain(actor, target);
+          beginDemonBargain(actor, demonTarget);
           return;
         }
 
