@@ -1015,8 +1015,8 @@
               <p id="turnPrompt">Your turn</p>
 
               <label>
-                What do they do? Type a creature's name to talk to or attack it.
-                <input id="actionText" type="text" placeholder="Explore the ruins, or attack the shadow beast..." required />
+                What do they do? Actions use a turn, even if the attempt fails.
+                <input id="actionText" type="text" placeholder="Search for food, teleport to a friend, or trade with a demon..." required />
               </label>
 
               <p>Every action requires a d20 roll.</p>
@@ -1051,6 +1051,17 @@
               <p id="relationshipEventMessage"></p>
               <div id="relationshipEventChoices" class="creation-choices"></div>
             </section>
+            </dialog>
+            <dialog id="demonBargainDialog" class="modal-dialog">
+              <form id="demonBargainForm" class="dialog-content">
+                <h3 id="demonBargainTitle">A demon offers a bargain</h3>
+                <p id="demonBargainMessage"></p>
+                <label>
+                  What do you want?
+                  <textarea id="demonBargainRequest" rows="3" maxlength="240" required placeholder="A knife that always critically hits the ogre..."></textarea>
+                </label>
+                <button type="submit" class="primary">Make the request</button>
+              </form>
             </dialog>
           </div>
         </section>
@@ -1150,6 +1161,8 @@
         deferredTurnActorId: null,
         pendingProposal: null,
         affairTargetId: null,
+        demonBargain: null,
+        demonContracts: [],
         turnCounter: 0,
         worldWidth: 9000,
         worldHeight: 5000
@@ -1222,6 +1235,11 @@
         relationshipEventTitle: document.getElementById("relationshipEventTitle"),
         relationshipEventMessage: document.getElementById("relationshipEventMessage"),
         relationshipEventChoices: document.getElementById("relationshipEventChoices"),
+        demonBargainDialog: document.getElementById("demonBargainDialog"),
+        demonBargainForm: document.getElementById("demonBargainForm"),
+        demonBargainTitle: document.getElementById("demonBargainTitle"),
+        demonBargainMessage: document.getElementById("demonBargainMessage"),
+        demonBargainRequest: document.getElementById("demonBargainRequest"),
         pickpocketDialog: document.getElementById("pickpocketDialog"),
         relationshipDialog: document.getElementById("relationshipDialog"),
         playerSetupDialog: document.getElementById("playerSetupDialog"),
@@ -1560,6 +1578,142 @@
 
       function sameMapSquare(first, second) {
         return distanceInSquares(first, second) === 0;
+      }
+
+      function canTeleport(entity) {
+        return /\b(gods?|goddesses|deities|demons?|devils?|angels?)\b/i.test(entity.type || "");
+      }
+
+      function isDemon(entity) {
+        return /\b(demons?|devils?)\b/i.test(entity?.type || "");
+      }
+
+      function teleportTo(entity, destination) {
+        entity.location = { x: destination.location.x, y: destination.location.y };
+      }
+
+      function beginDemonBargain(actor, demon) {
+        teleportTo(demon, actor);
+        state.demonBargain = { actorId: actor.id, demonId: demon.id };
+        actor.turnUsed = true;
+        elements.demonBargainTitle.textContent = `${demon.name} appears`;
+        elements.demonBargainMessage.textContent = `${demon.name} has teleported to you. “What do you want?”`;
+        elements.demonBargainRequest.value = "";
+        if (!elements.demonBargainDialog.open) elements.demonBargainDialog.showModal();
+        elements.demonBargainRequest.focus();
+        addLog(`<strong>${escapeHtml(demon.name)}</strong> teleports across the map to hear your trade request.`, demon);
+      }
+
+      function grantDemonGift(actor, request) {
+        const namedTarget = findActionTarget(request);
+        const wantsArmor = /\b(armor|armour|shield|helmet)\b/i.test(request);
+        const wantsWeapon = /\b(weapon|knife|knives|sword|dagger|bow|gun)\b/i.test(request);
+        const item = {
+          id: makeId(),
+          name: "Demon's Gift",
+          type: wantsArmor ? "Demon's Gift Armor" : wantsWeapon ? "Demon's Gift Weapon" : "Demon's Gift",
+          icon: wantsArmor ? "🛡️" : wantsWeapon ? "🔪" : "🎁",
+          description: request,
+          size: "small",
+          category: wantsArmor ? "armor" : wantsWeapon ? "weapon" : "misc",
+          durability: wantsArmor || wantsWeapon ? 100 : null,
+          maxDurability: wantsArmor || wantsWeapon ? 100 : null,
+          lastDurabilityDay: state.day,
+          range: 0,
+          ammo: null
+        };
+        if (wantsWeapon && namedTarget && /\b(?:critical(?:ly)?|crit)\b/i.test(request)) {
+          item.guaranteedCriticalTargetId = namedTarget.id;
+        }
+        if (wantsArmor && namedTarget && /\b(?:critical(?:ly)?|crit)\b/i.test(request)) {
+          item.criticalProtectionTargetId = namedTarget.id;
+        }
+        state.objects.push(item);
+        actor.inventory.push(item.id);
+        if (wantsWeapon && !actor.equippedWeaponId) actor.equippedWeaponId = item.id;
+        if (wantsArmor && !actor.equippedArmorId) actor.equippedArmorId = item.id;
+        addLog(`<strong>${escapeHtml(actor.name)}</strong> receives a ${escapeHtml(item.name)} for the request: “${escapeHtml(request)}”. It is added to their inventory.`);
+      }
+
+      function submitDemonBargain(event) {
+        event.preventDefault();
+        const bargain = state.demonBargain;
+        if (!bargain) return;
+        const actor = state.entities.find((entity) => entity.id === bargain.actorId);
+        const demon = state.entities.find((entity) => entity.id === bargain.demonId);
+        const request = elements.demonBargainRequest.value.trim();
+        if (!actor || !demon || !request) return;
+
+        const roll = rollD20();
+        if (roll <= 10) {
+          addLog(`<strong>${escapeHtml(demon.name)}</strong> refuses the request (d20: ${roll}; 1–10 refuses).`);
+        } else {
+          grantDemonGift(actor, request);
+          state.demonContracts.push({
+            demonId: demon.id,
+            requesterId: actor.id,
+            request,
+            dueDay: state.day + 2,
+            status: "pending",
+            targetId: null
+          });
+          addLog(`<strong>${escapeHtml(demon.name)}</strong> accepts the bargain (d20: ${roll}; 11–20 agrees). In two days, the demon will give you a target to kill.`);
+        }
+
+        state.demonBargain = null;
+        elements.demonBargainDialog.close();
+        elements.demonBargainForm.reset();
+        finishActorTurn(actor);
+      }
+
+      function completeDemonContractsForTarget(targetId) {
+        state.demonContracts
+          .filter((contract) => contract.status === "targeted" && contract.targetId === targetId)
+          .forEach((contract) => {
+            contract.status = "completed";
+            addLog("The demon's target is dead. The bargain is fulfilled, and the demons will not retaliate.");
+          });
+      }
+
+      function processDemonContracts() {
+        const player = state.entities.find((entity) => entity.isPlayer && entity.hp > 0);
+        if (!player) return;
+        const dueContracts = state.demonContracts.filter((contract) =>
+          contract.status === "pending" && state.day >= contract.dueDay
+        );
+        const assigned = [];
+        dueContracts.forEach((contract) => {
+          const candidates = state.entities.filter((entity) =>
+            entity.id !== contract.requesterId && entity.hp > 0 && !isDemon(entity)
+          );
+          const target = randomFrom(candidates);
+          if (!target) {
+            contract.status = "completed";
+            addLog("The demon had no living target to assign, so the bargain is considered fulfilled.");
+            return;
+          }
+          contract.status = "targeted";
+          contract.targetId = target.id;
+          const demon = state.entities.find((entity) => entity.id === contract.demonId && entity.hp > 0)
+            || state.entities.find((entity) => isDemon(entity) && entity.hp > 0);
+          if (demon) teleportTo(demon, player);
+          assigned.push({ demon, target });
+        });
+        if (!assigned.length) return;
+
+        const requests = assigned.map(({ demon, target }) =>
+          `${demon ? demon.name : "A demon"} appears and orders you to kill ${target.name}.`
+        );
+        state.deferredTurnActorId = null;
+        state.relationshipEvent = {
+          title: "The demon's bargain comes due",
+          message: requests.join(" "),
+          choices: [{
+            label: "I understand",
+            action: finishRelationshipEvent
+          }]
+        };
+        render();
       }
 
       function describeTravelDistance(distance) {
@@ -2076,6 +2230,7 @@
             state.currentIndex = 0;
             progressRelationships();
             addLog(`Day ${state.day} begins.`);
+            processDemonContracts();
           }
 
           const activeEntity = state.entities[state.currentIndex];
@@ -2096,6 +2251,7 @@
         }
 
         function clearDiceResults() {
+          if (isDiceAnimating || diceRollQueue.length) return;
           diceRollQueue.length = 0;
           if (diceRollInterval !== null) {
             window.clearInterval(diceRollInterval);
@@ -3303,6 +3459,7 @@
         }
 
         consumeResources(actor, structure.costs);
+        rollD20(actor, "intelligence");
         actor.turnUsed = true;
         beginConstruction(actor, structure);
         finishActorTurn(actor, true);
@@ -3597,6 +3754,12 @@
         rollCard.appendChild(face);
         rollCard.appendChild(status);
         elements.diceTray.appendChild(rollCard);
+        while (elements.diceTray.children.length > 8) {
+          const completedRoll = [...elements.diceTray.querySelectorAll(".dice-result")]
+            .find((card) => !card.querySelector(".dice-face")?.classList.contains("rolling"));
+          if (!completedRoll) break;
+          completedRoll.remove();
+        }
         diceRollQueue.push({ result, face, status, number: diceRollNumber });
         animateNextDiceRoll();
         return result;
@@ -3640,6 +3803,12 @@
           roll.face.classList.remove("rolling");
           roll.status.textContent = `Roll ${roll.number}: ${roll.result}`;
           isDiceAnimating = false;
+          while (elements.diceTray.children.length > 8) {
+            const completedRoll = [...elements.diceTray.querySelectorAll(".dice-result")]
+              .find((card) => !card.querySelector(".dice-face")?.classList.contains("rolling"));
+            if (!completedRoll) break;
+            completedRoll.remove();
+          }
           animateNextDiceRoll();
         }, 800);
       }
@@ -3779,6 +3948,7 @@
         addLog(`<strong>${escapeHtml(target.name)}</strong> ${reason} and takes ${actualDamage} damage (${target.hp}/${target.maxHp} HP).`, target);
 
         if (target.hp === 0) {
+          completeDemonContractsForTarget(target.id);
           if (target.isPlayer) {
             addLog(`<strong>${escapeHtml(target.name)} has been defeated.</strong>`);
           } else {
@@ -3835,12 +4005,18 @@
         } else if (thrown && roll < throwDistanceThreshold) {
           addLog(`<strong>${escapeHtml(attacker.name)}</strong> throws ${escapeHtml(weapon.name)} toward ${escapeHtml(target.name)} from ${distance} squares but misses (needs ${throwDistanceThreshold}+; rolled ${roll}).`);
         } else {
-          const critical = roll >= criticalThreshold;
+          const critical = roll >= criticalThreshold
+            || weapon?.guaranteedCriticalTargetId === target.id;
+          const armor = state.objects.find((item) => item.id === target.equippedArmorId);
+          const protectedCritical = critical && armor?.criticalProtectionTargetId === attacker.id;
           const baseDamage = Math.max(1, Math.ceil(target.maxHp * 0.1));
-          const damage = baseDamage * (critical ? 3 : 1) * (weapon ? 2 : 1);
+          const damage = baseDamage * (critical && !protectedCritical ? 3 : 1) * (weapon ? 2 : 1);
           const actualDamage = damageAfterArmor(target, damage);
-          addLog(`<strong>${escapeHtml(attacker.name)}</strong> rolls ${roll}/20 and ${critical ? "lands a critical hit on" : "hits"} <strong>${escapeHtml(target.name)}</strong> for ${actualDamage} damage${weapon ? ` with ${escapeHtml(weapon.name)}` : ""}.${thrown ? ` The throw required ${throwDistanceThreshold}+ at ${distance} squares.` : ""}${awarenessRoll === null ? "" : ` Awareness roll: ${awarenessRoll}/20.`}`);
-          applyDamage(target, actualDamage, critical ? "is critically hit" : "is hit", true);
+          const criticalMessage = protectedCritical
+            ? `lands a critical hit on <strong>${escapeHtml(target.name)}</strong>, but their armor negates it`
+            : critical ? `lands a critical hit on <strong>${escapeHtml(target.name)}</strong>` : `hits <strong>${escapeHtml(target.name)}</strong>`;
+          addLog(`<strong>${escapeHtml(attacker.name)}</strong> rolls ${roll}/20 and ${criticalMessage} for ${actualDamage} damage${weapon ? ` with ${escapeHtml(weapon.name)}` : ""}.${thrown ? ` The throw required ${throwDistanceThreshold}+ at ${distance} squares.` : ""}${awarenessRoll === null ? "" : ` Awareness roll: ${awarenessRoll}/20.`}`);
+          applyDamage(target, actualDamage, protectedCritical ? "is protected from a critical hit" : critical ? "is critically hit" : "is hit", true);
           if (target.hp <= 0 && yieldsLeather(target)) {
             const leather = Math.floor(Math.random() * 3) + 1;
             addResource(attacker, "leather", leather);
@@ -3902,12 +4078,17 @@
       }
 
       function moveToward(actor, target, distanceToMove = 0.5) {
+        if (canTeleport(actor)) {
+          teleportTo(actor, target);
+          return "teleports";
+        }
         const distance = distanceBetween(actor, target);
-        if (distance === 0) return;
+        if (distance === 0) return "moves";
         const traveled = Math.min(distanceToMove, distance);
         const ratio = traveled / distance;
         actor.location.x += (target.location.x - actor.location.x) * ratio;
         actor.location.y += (target.location.y - actor.location.y) * ratio;
+        return "moves";
       }
 
       function findUsableWeapon(entity) {
@@ -4193,7 +4374,7 @@
         }
       }
 
-      function resolveAction(event) {
+      function resolveActionCore(event) {
         event.preventDefault();
         if (state.pendingCreationActorId) return;
 
@@ -4224,6 +4405,32 @@
         const actionText = elements.actionText.value.trim() || "takes a bold action";
         const target = findActionTarget(actionText);
         const intent = socialIntent(actionText);
+
+        if (/\b(trade|bargain|deal)\b/i.test(actionText) && target && isDemon(target)) {
+          elements.actionText.value = "";
+          beginDemonBargain(actor, target);
+          return;
+        }
+
+        if (/\bteleport\b/i.test(actionText)) {
+          if (!canTeleport(actor)) {
+            addLog(`${escapeHtml(actor.name)} cannot teleport; only gods, demons, and angels can do that.`);
+            render();
+            return;
+          }
+          const destination = findTravelTarget(actionText, actor);
+          if (!destination) {
+            addLog("To teleport, type the name of a created, living creature.");
+            render();
+            return;
+          }
+          teleportTo(actor, destination);
+          actor.turnUsed = true;
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> teleports across the map to ${escapeHtml(destination.name)}.`);
+          elements.actionText.value = "";
+          finishActorTurn(actor, true);
+          return;
+        }
 
         if (/\b(search|scavenge|forage|look)\b.*\b(food|berries|mushrooms|ration)\b/i.test(actionText)) {
           searchForFood(actor);
@@ -4361,6 +4568,35 @@
         finishActorTurn(actor);
       }
 
+      function resolveAction(event) {
+        if (state.pendingCreationActorId) {
+          resolveActionCore(event);
+          return;
+        }
+        const actor = state.entities[state.currentIndex];
+        const actorIndex = state.currentIndex;
+        const startingDay = state.day;
+        const startingRollNumber = diceRollNumber;
+        const actionText = elements.actionText.value.trim() || "takes a bold action";
+        resolveActionCore(event);
+
+        if (!actor?.isPlayer) return;
+        if (diceRollNumber === startingRollNumber) {
+          rollD20(actor, actionStat(actionText));
+        }
+        if (state.pendingCreationActorId) return;
+        if (!state.pickpocket
+          && !state.relationshipEvent
+          && !state.demonBargain
+          && !actor.turnUsed
+          && state.currentIndex === actorIndex
+          && state.day === startingDay) {
+          actor.turnUsed = true;
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> spends the turn attempting: “${escapeHtml(actionText)}”.`, actor);
+          finishActorTurn(actor);
+        }
+      }
+
       function finishActorTurn(actor, skipCreation = false) {
         if (state.relationshipEvent) {
           state.deferredTurnActorId = actor.id;
@@ -4403,7 +4639,7 @@
 
       function scheduleAiTurn() {
         if (aiTurnTimer) clearTimeout(aiTurnTimer);
-        if (state.pickpocket || state.relationshipEvent) return;
+        if (state.pickpocket || state.relationshipEvent || state.demonBargain) return;
         if (state.entities.some((entity) => entity.isPlayer && entity.hp <= 0)) return;
         const activeEntity = state.entities[state.currentIndex];
         if (activeEntity && !activeEntity.isPlayer && !activeEntity.turnUsed) {
@@ -4416,15 +4652,31 @@
         const actor = state.entities[state.currentIndex];
         if (!actor || actor.isPlayer || actor.turnUsed) return;
 
+        const player = state.entities.find((entity) => entity.isPlayer && entity.hp > 0);
+        const unpaidContract = state.demonContracts.find((contract) =>
+          contract.status === "targeted"
+          && contract.requesterId === player?.id
+          && state.entities.some((entity) => entity.id === contract.targetId && entity.hp > 0)
+        );
+        if (player && unpaidContract && isDemon(actor)) {
+          teleportTo(actor, player);
+          actor.turnUsed = true;
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> teleports to you because the demon's target is still alive, and attacks!`, actor);
+          resolveAttack(actor, player);
+          finishActorTurn(actor);
+          return;
+        }
+
         const hatedTarget = state.entities.find((entity) => actor.hostileTo.includes(entity.id) && entity.hp > 0);
         if (hatedTarget && !isPassiveAnimal(actor)) {
           if (prepareForHostility(actor)) return;
           const weapon = findUsableWeapon(actor);
           const attackRange = weapon?.range || 0;
           if (distanceInSquares(actor, hatedTarget) > attackRange) {
-            moveToward(actor, hatedTarget);
+            rollD20(actor, "agility");
+            const movement = moveToward(actor, hatedTarget);
             actor.turnUsed = true;
-            addLog(`<strong>${escapeHtml(actor.name)}</strong> moves toward ${escapeHtml(hatedTarget.name)} to attack.`);
+            addLog(`<strong>${escapeHtml(actor.name)}</strong> ${movement} toward ${escapeHtml(hatedTarget.name)} to attack.`);
             beginTurnCreation(actor);
             return;
           }
@@ -4438,6 +4690,7 @@
         const suspiciousTarget = state.entities.find((entity) => actor.suspiciousOf.includes(entity.id) && entity.hp > 0);
         if (suspiciousTarget) {
           equipAvailableCombatGear(actor);
+          rollD20(actor, "agility");
           moveAwayFrom(actor, suspiciousTarget);
           actor.turnUsed = true;
           addLog(`<strong>${escapeHtml(actor.name)}</strong> moves away from ${escapeHtml(suspiciousTarget.name)} and stays on guard.`);
@@ -4451,9 +4704,10 @@
             const weapon = findUsableWeapon(actor);
             const attackRange = weapon?.range || 0;
             if (distanceInSquares(actor, target) > attackRange) {
-              moveToward(actor, target);
+              rollD20(actor, "agility");
+              const movement = moveToward(actor, target);
               actor.turnUsed = true;
-              addLog(`<strong>${escapeHtml(actor.name)}</strong> moves closer to ${escapeHtml(target.name)} to attack.`);
+              addLog(`<strong>${escapeHtml(actor.name)}</strong> ${movement} closer to ${escapeHtml(target.name)} to attack.`);
               beginTurnCreation(actor);
               return;
             }
@@ -4496,9 +4750,10 @@
           || (!actor.priority && Math.random() < 0.35);
         if (socialTarget && shouldSeekSocial) {
           if (!sameMapSquare(actor, socialTarget)) {
-            moveToward(actor, socialTarget);
+            rollD20(actor, "agility");
+            const movement = moveToward(actor, socialTarget);
             actor.turnUsed = true;
-            addLog(`<strong>${escapeHtml(actor.name)}</strong> moves toward ${escapeHtml(socialTarget.name)} to talk.`);
+            addLog(`<strong>${escapeHtml(actor.name)}</strong> ${movement} toward ${escapeHtml(socialTarget.name)} to talk.`);
             beginTurnCreation(actor);
             return;
           }
@@ -4509,6 +4764,7 @@
             manipulating: `asks ${socialTarget.name} a question`
           }[actor.priority] || `says hello to ${socialTarget.name}`;
           if (socialTarget.isPlayer) {
+            rollD20(actor, "charisma");
             const player = socialTarget;
             state.deferredTurnActorId = actor.id;
             state.relationshipEvent = {
@@ -4594,6 +4850,7 @@
         state.currentIndex = 0;
         progressRelationships();
         addLog(`Day ${state.day} begins. Everyone is ready to act again.`);
+        processDemonContracts();
         render();
         scheduleAiTurn();
       }
@@ -4626,6 +4883,7 @@
         elements.createForm.addEventListener("submit", createBeing);
         elements.objectForm.addEventListener("submit", createObject);
         elements.actionForm.addEventListener("submit", resolveAction);
+        elements.demonBargainForm.addEventListener("submit", submitDemonBargain);
         elements.pickpocketRoll.addEventListener("click", choosePickpocketRoll);
         elements.pickpocketMiniGame.addEventListener("click", startPickpocketMiniGame);
         elements.startPickpocketGame.addEventListener("click", stopPickpocketMiniGame);
@@ -4698,10 +4956,10 @@
         document.querySelectorAll("[data-close-dialog]").forEach((button) => {
           button.addEventListener("click", () => document.getElementById(button.dataset.closeDialog).close());
         });
-        [elements.playerSetupDialog, elements.pickpocketDialog, elements.relationshipDialog].forEach((dialog) => {
+        [elements.playerSetupDialog, elements.pickpocketDialog, elements.relationshipDialog, elements.demonBargainDialog].forEach((dialog) => {
           dialog.addEventListener("cancel", (event) => event.preventDefault());
         });
-        [elements.pickpocketDialog, elements.relationshipDialog].forEach((dialog) => {
+        [elements.pickpocketDialog, elements.relationshipDialog, elements.demonBargainDialog].forEach((dialog) => {
           dialog.addEventListener("click", (event) => {
             if (event.target === dialog) event.preventDefault();
           });
