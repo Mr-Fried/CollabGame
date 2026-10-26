@@ -1005,10 +1005,10 @@
 
               <label>
                 What do they do? Type a creature's name to talk to or attack it.
-                <input id="actionText" type="text" placeholder="Explore the ruins, or attack the shadow beast..." required />
+                <input id="actionText" type="text" placeholder="Explore the ruins, or summon Netanyahu..." required />
               </label>
 
-              <p>Every action requires a d20 roll.</p>
+              <p>Most actions require a d20 roll. Summon Netanyahu with 15+, then summon Gadi Eizenkot to challenge him. Voters need a charisma roll of 7+.</p>
 
               <div id="diceTray" class="dice-tray" aria-live="polite">
                 <p class="dice-result-status">Ready to roll</p>
@@ -1139,6 +1139,8 @@
         deferredTurnActorId: null,
         pendingProposal: null,
         affairTargetId: null,
+        netanyahuElection: null,
+        gadiElection: null,
         turnCounter: 0,
         worldWidth: 9000,
         worldHeight: 5000
@@ -2187,20 +2189,26 @@
 
           const health = document.createElement("div");
           health.className = "entity-health";
-          const healthPercentage = entity.maxHp > 0
+          const healthPercentage = entity.isInvulnerable
+            ? 100
+            : entity.maxHp > 0
             ? Math.max(0, Math.min(100, (entity.hp / entity.maxHp) * 100))
             : 0;
           const healthValue = document.createElement("span");
           healthValue.className = "entity-health-value";
-          healthValue.textContent = `${entity.hp}/${entity.maxHp} HP`;
+          healthValue.textContent = entity.isInvulnerable ? "∞ HP" : `${entity.hp}/${entity.maxHp} HP`;
           const healthTrack = document.createElement("div");
           healthTrack.className = "entity-health-track";
           healthTrack.setAttribute("role", "progressbar");
           healthTrack.setAttribute("aria-label", `${entity.name} health`);
           healthTrack.setAttribute("aria-valuemin", "0");
-          healthTrack.setAttribute("aria-valuemax", String(entity.maxHp));
-          healthTrack.setAttribute("aria-valuenow", String(entity.hp));
-          healthTrack.setAttribute("aria-valuetext", `${entity.hp} of ${entity.maxHp} HP`);
+          if (entity.isInvulnerable) {
+            healthTrack.setAttribute("aria-valuetext", "Infinite health");
+          } else {
+            healthTrack.setAttribute("aria-valuemax", String(entity.maxHp));
+            healthTrack.setAttribute("aria-valuenow", String(entity.hp));
+            healthTrack.setAttribute("aria-valuetext", `${entity.hp} of ${entity.maxHp} HP`);
+          }
           const healthFill = document.createElement("div");
           healthFill.className = `entity-health-fill${healthPercentage <= 25 ? " critical" : healthPercentage <= 50 ? " low" : ""}`;
           healthFill.style.width = `${healthPercentage}%`;
@@ -2376,6 +2384,29 @@
             constructionBadge.className = "mini-badge";
             constructionBadge.textContent = `Constructing: ${entity.busyTurns} turns left`;
             badges.appendChild(constructionBadge);
+          }
+          const election = entity.isNetanyahu
+            ? state.netanyahuElection
+            : entity.isGadiEizenkot
+              ? state.gadiElection
+              : null;
+          if (election?.candidateId === entity.id) {
+            const electionBadge = document.createElement("span");
+            electionBadge.className = "mini-badge";
+            electionBadge.textContent = election.status === "campaigning"
+              ? `Election: ${election.votes.length}/3 votes · ${election.turnsRemaining} turns left`
+              : election.status === "won"
+                ? "Prime Minister"
+                : election.status === "dethroned"
+                  ? "Dethroned"
+                  : "Election campaign ended";
+            badges.appendChild(electionBadge);
+          }
+          if (entity.obeysPlayerId) {
+            const obedienceBadge = document.createElement("span");
+            obedienceBadge.className = "mini-badge";
+            obedienceBadge.textContent = "Must obey you";
+            badges.appendChild(obedienceBadge);
           }
 
           const otherEntities = state.entities.filter((being) => being.id !== entity.id);
@@ -2732,6 +2763,115 @@
         });
       }
 
+      function showNetanyahuWishOptions(candidate) {
+        const targets = state.entities.filter((entity) =>
+          !entity.isPlayer && !entity.isInvulnerable && entity.hp > 0 && entity.id !== candidate.id
+        );
+        const kinds = [...new Set(targets.map((entity) => entity.type))];
+        const choices = [];
+        if (targets.length) {
+          choices.push({
+            label: "Kill one creature",
+            action: () => chooseNetanyahuWishTarget(candidate, "kill-one", targets)
+          });
+          choices.push({
+            label: "Kill all creatures of a specific kind",
+            action: () => chooseNetanyahuWishTarget(candidate, "kill-kind", kinds)
+          });
+          choices.push({
+            label: "Make a creature obey your commands",
+            action: () => chooseNetanyahuWishTarget(candidate, "obey", targets)
+          });
+        } else {
+          choices.push({
+            label: "Finish",
+            action: () => {
+              addLog("There are no other creatures left for Netanyahu to grant a wish about.");
+              finishRelationshipEvent();
+            }
+          });
+        }
+        state.relationshipEvent = {
+          title: "Netanyahu becomes Prime Minister",
+          message: "He grants you one wish. Choose carefully.",
+          choices
+        };
+        render();
+      }
+
+      function chooseNetanyahuWishTarget(candidate, wish, options) {
+        const choices = options.map((option) => {
+          const isEntity = typeof option !== "string";
+          const label = isEntity ? option.name : option;
+          return {
+            label,
+            action: () => {
+              if (wish === "kill-one") {
+                removeEntity(option.id, "is killed by Netanyahu's wish", false, false);
+                addLog(`<strong>${escapeHtml(candidate.name)}</strong> grants your wish: <strong>${escapeHtml(label)}</strong> is killed.`);
+              } else if (wish === "kill-kind") {
+                const victims = state.entities.filter((entity) =>
+                  !entity.isPlayer && !entity.isInvulnerable && entity.hp > 0 && entity.type === option
+                );
+                victims.forEach((entity) => removeEntity(entity.id, "is killed by Netanyahu's wish", false, false));
+                addLog(`<strong>${escapeHtml(candidate.name)}</strong> grants your wish: all ${escapeHtml(option)} creatures are killed (${victims.length}).`);
+              } else {
+                option.obeysPlayerId = state.entities.find((entity) => entity.isPlayer)?.id || "";
+                addLog(`<strong>${escapeHtml(candidate.name)}</strong> grants your wish: <strong>${escapeHtml(label)}</strong> must obey your commands.`);
+              }
+              finishRelationshipEvent();
+            }
+          };
+        });
+        state.relationshipEvent = {
+          title: wish === "kill-one"
+            ? "Choose a creature to kill"
+            : wish === "kill-kind"
+              ? "Choose a kind of creature"
+              : "Choose a creature to command",
+          message: "Select your wish target.",
+          choices
+        };
+        render();
+      }
+
+      function electNetanyahu(candidate) {
+        candidate.naturalStats = {
+          traits: [...candidate.traits],
+          traitModifiers: { ...candidate.traitModifiers },
+          hp: candidate.hp,
+          maxHp: candidate.maxHp
+        };
+        candidate.traits = positiveTraits.map((trait) => trait.name);
+        candidate.traitModifiers = Object.fromEntries(candidate.traits.map((trait) => [trait, 10]));
+        candidate.hp = Infinity;
+        candidate.maxHp = Infinity;
+        candidate.isInvulnerable = true;
+        candidate.isPrimeMinister = true;
+        candidate.type = "Prime Minister";
+        candidate.description = "An immortal Prime Minister with every trait at its maximum.";
+      }
+
+      function dethroneNetanyahu(candidate) {
+        if (candidate.naturalStats) {
+          candidate.traits = candidate.naturalStats.traits;
+          candidate.traitModifiers = candidate.naturalStats.traitModifiers;
+          candidate.hp = candidate.naturalStats.hp;
+          candidate.maxHp = candidate.naturalStats.maxHp;
+          candidate.naturalStats = null;
+        }
+        candidate.isInvulnerable = false;
+        candidate.isPrimeMinister = false;
+        candidate.type = "Human";
+        candidate.description = "A mortal creature, no longer Prime Minister.";
+        const player = state.entities.find((entity) => entity.isPlayer);
+        if (player) {
+          candidate.hostileTo = candidate.hostileTo.filter((entityId) => entityId !== player.id);
+          delete state.relationships[relationshipKey(candidate.id, player.id)];
+        }
+        if (state.netanyahuElection) state.netanyahuElection.status = "dethroned";
+      }
+
       function renderLog() {
         elements.logList.innerHTML = "";
 
@@ -2778,8 +2918,9 @@
       }
 
       async function findCreatureImage(entity) {
-        if (/\b(human|person|people)\b/i.test(entity.type)) return null;
-        const search = `${entity.type} filetype:bitmap`;
+        const namedCreature = ["benjamin netanyahu", "gadi eizenkot"].includes(entity.name.toLowerCase());
+        if (!namedCreature && /\b(human|person|people)\b/i.test(entity.type)) return null;
+        const search = `${namedCreature ? entity.name : entity.type} filetype:bitmap`;
         const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(search)}&gsrnamespace=6&gsrlimit=1&prop=imageinfo&iiprop=url%7Cextmetadata&iiurlwidth=256&format=json&origin=*`;
 
         try {
@@ -2804,7 +2945,8 @@
         const hp = startingHitPoints(entityInput.name, entityInput.type);
         const description = String(entityInput.description || "").trim() || "A bold and unforgettable being.";
         const effects = getDescriptionEffects(description);
-        const maxHp = Math.max(1, hp + traitHpModifier(traits));
+        const isInvulnerable = Boolean(entityInput.isInvulnerable);
+        const maxHp = isInvulnerable ? Infinity : Math.max(1, hp + traitHpModifier(traits));
         const entity = {
           id: makeId(),
           name: entityInput.name.trim(),
@@ -2823,8 +2965,14 @@
           icon: entityInput.icon.trim() || randomFrom(iconChoices(entityInput.type, entityInput.gender)),
           traits,
           traitModifiers: modifiers,
-          hp: maxHp,
+          hp: isInvulnerable ? Infinity : maxHp,
           maxHp,
+          isInvulnerable,
+          isNetanyahu: Boolean(entityInput.isNetanyahu),
+          isGadiEizenkot: Boolean(entityInput.isGadiEizenkot),
+          isPrimeMinister: false,
+          naturalStats: null,
+          obeysPlayerId: entityInput.obeysPlayerId || "",
           image: "",
           imageSource: "",
           hostileTo: [],
@@ -3520,6 +3668,12 @@
       }
 
       function applyDamage(target, damage, reason, ignoreArmor = false) {
+        if (target.isInvulnerable || target.isNetanyahu) {
+          addLog(target.isNetanyahu && !target.isInvulnerable
+            ? `<strong>${escapeHtml(target.name)}</strong> can only be killed after Gadi Eizenkot becomes Prime Minister.`
+            : `<strong>${escapeHtml(target.name)}</strong> is unharmed by the attack.`, target);
+          return 0;
+        }
         const actualDamage = damageAfterArmor(target, damage, ignoreArmor);
         target.hp = Math.max(0, target.hp - actualDamage);
         addLog(`<strong>${escapeHtml(target.name)}</strong> ${reason} and takes ${actualDamage} damage (${target.hp}/${target.maxHp} HP).`, target);
@@ -3558,11 +3712,18 @@
           if (weapon) wearItem(attacker, weapon);
         } else {
           const critical = roll >= criticalThreshold;
-          const baseDamage = Math.max(1, Math.ceil(target.maxHp * 0.1));
-          const damage = baseDamage * (critical ? 3 : 1) * (weapon ? 2 : 1);
-          const actualDamage = damageAfterArmor(target, damage);
-          addLog(`<strong>${escapeHtml(attacker.name)}</strong> rolls ${roll}/20 and ${critical ? "lands a critical hit on" : "hits"} <strong>${escapeHtml(target.name)}</strong> for ${actualDamage} damage${weapon ? ` with ${escapeHtml(weapon.name)}` : ""}.${awarenessRoll === null ? "" : ` Awareness roll: ${awarenessRoll}/20.`}`);
-          applyDamage(target, actualDamage, critical ? "is critically hit" : "is hit", true);
+          if (target.isInvulnerable || target.isNetanyahu) {
+            const reason = target.isNetanyahu && !target.isInvulnerable
+              ? "he can only be killed after Gadi Eizenkot becomes Prime Minister"
+              : "their infinite health leaves them unharmed";
+            addLog(`<strong>${escapeHtml(attacker.name)}</strong> rolls ${roll}/20 and hits <strong>${escapeHtml(target.name)}</strong>, but ${reason}.${weapon ? ` The attack uses ${escapeHtml(weapon.name)}.` : ""}${awarenessRoll === null ? "" : ` Awareness roll: ${awarenessRoll}/20.`}`);
+          } else {
+            const baseDamage = Math.max(1, Math.ceil(target.maxHp * 0.1));
+            const damage = baseDamage * (critical ? 3 : 1) * (weapon ? 2 : 1);
+            const actualDamage = damageAfterArmor(target, damage);
+            addLog(`<strong>${escapeHtml(attacker.name)}</strong> rolls ${roll}/20 and ${critical ? "lands a critical hit on" : "hits"} <strong>${escapeHtml(target.name)}</strong> for ${actualDamage} damage${weapon ? ` with ${escapeHtml(weapon.name)}` : ""}.${awarenessRoll === null ? "" : ` Awareness roll: ${awarenessRoll}/20.`}`);
+            applyDamage(target, actualDamage, critical ? "is critically hit" : "is hit", true);
+          }
           if (target.hp <= 0 && yieldsLeather(target)) {
             const leather = Math.floor(Math.random() * 3) + 1;
             addResource(attacker, "leather", leather);
@@ -3926,6 +4087,163 @@
         const target = findActionTarget(actionText);
         const intent = socialIntent(actionText);
 
+        if (/\bsummon\s+(?:benjamin\s+)?netanyahu\b/i.test(actionText)) {
+          if (state.entities.some((entity) => entity.isNetanyahu)) {
+            addLog("Benjamin Netanyahu has already been summoned.");
+            render();
+            return;
+          }
+          const roll = rollD20(actor, "luck");
+          actor.turnUsed = true;
+          if (roll >= 15) {
+            addEntity({
+              name: "Benjamin Netanyahu",
+              type: "Human",
+              icon: "🇮🇱",
+              description: "A summoned creature campaigning to become Prime Minister. He will become immortal and gain maximum traits only if elected.",
+              isNetanyahu: true
+            }, true);
+            const candidate = state.entities.find((entity) => entity.isNetanyahu);
+            state.netanyahuElection = candidate
+              ? { candidateId: candidate.id, status: "campaigning", turnsRemaining: 10, votes: [] }
+              : null;
+            addLog(`<strong>${escapeHtml(actor.name)}</strong> rolls ${roll}/20 and summons Benjamin Netanyahu!`);
+            addLog("Benjamin Netanyahu asks you to get votes from three different creatures. You have 10 turns.");
+            advanceTurn();
+            render();
+            scheduleAiTurn();
+          } else {
+            addLog(`<strong>${escapeHtml(actor.name)}</strong> rolls ${roll}/20 and fails to summon Benjamin Netanyahu (needs 15+).`);
+            finishActorTurn(actor);
+          }
+          elements.actionText.value = "";
+          return;
+        }
+
+        if (/\bsummon\s+gadi(?:\s+eizenkot)?\b/i.test(actionText)) {
+          const netanyahu = state.entities.find((entity) => entity.isNetanyahu);
+          if (!netanyahu || !netanyahu.isPrimeMinister || state.netanyahuElection?.status !== "won") {
+            addLog("Netanyahu must first win his election before you can summon Gadi Eizenkot to challenge him.");
+            render();
+            return;
+          }
+          if (state.entities.some((entity) => entity.isGadiEizenkot)) {
+            addLog("Gadi Eizenkot has already been summoned.");
+            render();
+            return;
+          }
+          addEntity({
+            name: "Gadi Eizenkot",
+            type: "Human",
+            icon: "🗳️",
+            description: "A summoned creature campaigning to become Prime Minister.",
+            isGadiEizenkot: true
+          }, true);
+          const candidate = state.entities.find((entity) => entity.isGadiEizenkot);
+          state.gadiElection = candidate
+            ? { candidateId: candidate.id, status: "campaigning", turnsRemaining: 11, votes: [] }
+            : null;
+          actor.turnUsed = true;
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> summons Gadi Eizenkot to challenge Netanyahu.`);
+          addLog("Get votes from three different creatures within 10 turns. Each voter needs a 7+ charisma roll.");
+          elements.actionText.value = "";
+          finishActorTurn(actor);
+          return;
+        }
+
+        const voteMatch = actionText.match(/\bvote\s+for\s+(benjamin\s+)?(netanyahu|gadi(?:\s+eizenkot)?)\b/i);
+        if (voteMatch) {
+          const votingForGadi = voteMatch[2].toLowerCase().startsWith("gadi");
+          const election = votingForGadi ? state.gadiElection : state.netanyahuElection;
+          const candidate = election && state.entities.find((entity) => entity.id === election.candidateId);
+          if (!election || election.status !== "campaigning" || !candidate) {
+            addLog(`There is no active ${votingForGadi ? "Gadi Eizenkot" : "Netanyahu"} election campaign.`);
+            render();
+            return;
+          }
+          const voterText = actionText.replace(voteMatch[0], "");
+          const voter = findActionTarget(voterText);
+          if (!voter) {
+            addLog(`To request a vote, enter “ask [creature name] to vote for ${votingForGadi ? "Gadi Eizenkot" : "Netanyahu"}.”`);
+            render();
+            return;
+          }
+          if (voter.id === candidate.id) {
+            addLog(`${escapeHtml(candidate.name)} cannot vote for himself. Ask another creature to vote.`);
+            render();
+            return;
+          }
+          if (election.votes.includes(voter.id)) {
+            addLog(`<strong>${escapeHtml(voter.name)}</strong> has already voted for ${escapeHtml(candidate.name)}.`);
+            render();
+            return;
+          }
+          const voteRoll = rollD20(voter, "charisma");
+          actor.turnUsed = true;
+          if (voteRoll >= 7) {
+            election.votes.push(voter.id);
+            addLog(`<strong>${escapeHtml(voter.name)}</strong> rolls ${voteRoll}/20 charisma and agrees to vote for ${escapeHtml(candidate.name)} (needs 7+). ${election.votes.length}/3 votes from different creatures.`);
+            if (election.votes.length >= 3) {
+              election.status = "won";
+              candidate.type = "Prime Minister";
+              candidate.isPrimeMinister = true;
+              if (candidate.isNetanyahu) {
+                electNetanyahu(candidate);
+                addLog("<strong>Benjamin Netanyahu</strong> has received three votes and becomes Prime Minister! He is now immortal and all his traits are maxed out.");
+                showNetanyahuWishOptions(candidate);
+              } else {
+                const previousPrimeMinister = state.entities.find((entity) => entity.isNetanyahu);
+                if (previousPrimeMinister) dethroneNetanyahu(previousPrimeMinister);
+                addLog("<strong>Gadi Eizenkot</strong> has received three votes and becomes Prime Minister. Netanyahu is mortal again; ask Gadi to kill him.");
+              }
+            }
+          } else {
+            addLog(`<strong>${escapeHtml(voter.name)}</strong> rolls ${voteRoll}/20 charisma and declines to vote for ${escapeHtml(candidate.name)} (needs 7+).`);
+          }
+          elements.actionText.value = "";
+          finishActorTurn(actor);
+          return;
+        }
+
+        const killNetanyahuCommand = actionText.match(/^\s*(?:ask|tell|command)\s+(?:gadi(?:\s+eizenkot)?|him)\s+(?:to|that)\s+(?:kill|attack)\s+(?:benjamin\s+)?netanyahu\b/i);
+        const electedGadi = state.entities.find((entity) => entity.isGadiEizenkot && entity.isPrimeMinister);
+        const netanyahu = state.entities.find((entity) => entity.isNetanyahu);
+        if (killNetanyahuCommand) {
+          if (!electedGadi || electedGadi.hp <= 0 || state.gadiElection?.status !== "won") {
+            addLog("Gadi Eizenkot must be alive and Prime Minister before he can kill Netanyahu.");
+            render();
+            return;
+          }
+          if (!netanyahu) {
+            addLog("Netanyahu has already been killed.");
+            render();
+            return;
+          }
+          actor.turnUsed = true;
+          elements.actionText.value = "";
+          addLog(`<strong>${escapeHtml(electedGadi.name)}</strong> obeys your command.`);
+          removeEntity(netanyahu.id, "is killed by Gadi Eizenkot at your command", true, false);
+          finishActorTurn(actor);
+          return;
+        }
+
+        const commandMatch = actionText.match(/^\s*(?:ask|tell|command)\s+(.+?)\s+(?:to|that)\s+(.+)$/i);
+        const commandTarget = commandMatch ? findActionTarget(commandMatch[1]) : null;
+        if (commandMatch && commandTarget?.obeysPlayerId === actor.id) {
+          const requestedAction = commandMatch[2].trim();
+          const commandedTarget = findActionTarget(requestedAction);
+          actor.turnUsed = true;
+          elements.actionText.value = "";
+          if (isAttackAction(requestedAction) && commandedTarget && commandedTarget.id !== commandTarget.id) {
+            addLog(`<strong>${escapeHtml(commandTarget.name)}</strong> obeys your command to ${escapeHtml(requestedAction)}.`);
+            resolveAttack(commandTarget, commandedTarget);
+          } else {
+            addLog(`<strong>${escapeHtml(commandTarget.name)}</strong> obeys your command: ${escapeHtml(requestedAction)}.`);
+          }
+          finishActorTurn(actor);
+          return;
+        }
+
         if (/\b(search|scavenge|forage|look)\b.*\b(food|berries|mushrooms|ration)\b/i.test(actionText)) {
           searchForFood(actor);
           return;
@@ -4036,6 +4354,27 @@
       }
 
       function finishActorTurn(actor, skipCreation = false) {
+        if (actor.isPlayer) {
+          for (const election of [state.netanyahuElection, state.gadiElection]) {
+            if (election?.status !== "campaigning") continue;
+            election.turnsRemaining -= 1;
+            if (election.turnsRemaining <= 0) {
+              election.turnsRemaining = 0;
+              election.status = "failed";
+              const isNetanyahuElection = election === state.netanyahuElection;
+              addLog(isNetanyahuElection
+                ? "Netanyahu's election campaign ends without three votes. He does not become Prime Minister."
+                : "Gadi Eizenkot's election campaign ends without three votes.");
+              if (isNetanyahuElection) {
+                const candidate = state.entities.find((entity) => entity.id === election.candidateId);
+                if (candidate && candidate.hp > 0) {
+                  setHostile(candidate, actor);
+                  addLog(`<strong>${escapeHtml(candidate.name)}</strong> is furious and will attack you every turn until you are defeated.`);
+                }
+              }
+            }
+          }
+        }
         if (state.relationshipEvent) {
           state.deferredTurnActorId = actor.id;
           render();
@@ -4090,13 +4429,18 @@
         const actor = state.entities[state.currentIndex];
         if (!actor || actor.isPlayer || actor.turnUsed) return;
 
-        const hatedTarget = state.entities.find((entity) => actor.hostileTo.includes(entity.id) && entity.hp > 0);
+        const failedNetanyahuCampaign = actor.isNetanyahu
+          && state.netanyahuElection?.candidateId === actor.id
+          && state.netanyahuElection.status === "failed";
+        const hatedTarget = failedNetanyahuCampaign
+          ? state.entities.find((entity) => entity.isPlayer && entity.hp > 0)
+          : state.entities.find((entity) => actor.hostileTo.includes(entity.id) && entity.hp > 0);
         if (hatedTarget && !isPassiveAnimal(actor)) {
-          if (prepareForHostility(actor)) return;
+          if (!failedNetanyahuCampaign && prepareForHostility(actor)) return;
           actor.turnUsed = true;
           addLog(`<strong>${escapeHtml(actor.name)}</strong> seeks revenge and attacks ${escapeHtml(hatedTarget.name)}.`);
           resolveAttack(actor, hatedTarget);
-          finishActorTurn(actor);
+          finishActorTurn(actor, failedNetanyahuCampaign);
           return;
         }
 
