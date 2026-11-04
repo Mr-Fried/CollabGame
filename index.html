@@ -99,9 +99,21 @@
 
       .layout {
         display: grid;
-        grid-template-columns: 340px minmax(420px, 1.2fr) 420px;
+        grid-template-columns: minmax(420px, 1.2fr) 420px;
         gap: 20px;
       }
+
+      .world-status {
+        display: flex;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 10px 24px;
+        margin: 0 0 20px;
+        color: var(--muted);
+      }
+
+      .world-status p { margin: 0; }
+      .world-status .quest-status { flex-basis: 100%; }
 
       .panel {
         background: var(--panel);
@@ -847,16 +859,14 @@
         </div>
       </header>
 
-      <main class="layout">
-        <aside class="panel">
-          <h2>Your Class</h2>
-          <p id="playerClassSummary">Choose a class when creating your character.</p>
-          <p id="playerMoney">Money: 0 coins</p>
-          <p id="currentCity">Outside a city</p>
-          <div id="questStatus" class="quest-status"></div>
-          <p>Summoning, healing, and sleeping together are turn actions. Animals cannot talk or socialize.</p>
-        </aside>
+      <section class="world-status" aria-label="World status">
+        <p id="playerClassSummary">Choose a class when creating your character.</p>
+        <p id="playerMoney">Money: 0 coins</p>
+        <p id="currentCity">Outside a city</p>
+        <div id="questStatus" class="quest-status"></div>
+      </section>
 
+      <main class="layout">
         <section class="main-panel">
           <div class="panel">
             <div class="panel-header">
@@ -875,17 +885,7 @@
                 What do they do? Type a creature's name to talk to or attack it.
                 <input id="actionText" type="text" placeholder="Explore the ruins, or summon Netanyahu..." required />
               </label>
-              <label>
-                Race
-                <select id="playerRace" required>
-                  <option value="Human">Human</option>
-                  <option value="Orc">Orc</option>
-                  <option value="Goblin">Goblin</option>
-                  <option value="Elf">Elf</option>
-                </select>
-              </label>
-
-              <p>Most actions require a d20 roll. Summon Netanyahu with 15+, then summon Gadi Eizenkot to challenge him. Voters need a charisma roll of 7+.</p>
+              <p>Most actions require a d20 roll. Walking, running, and sprinting do not. Summon Netanyahu with 15+, then summon Gadi Eizenkot to challenge him. Voters need a charisma roll of 7+.</p>
 
               <div id="diceTray" class="dice-tray" aria-live="polite">
                 <p class="dice-result-status">Ready to roll</p>
@@ -988,6 +988,15 @@
           <input id="playerAge" type="number" min="1" value="18" required />
         </label>
         <label>
+          Race
+          <select id="playerRace" required>
+            <option value="Human">Human</option>
+            <option value="Orc">Orc</option>
+            <option value="Goblin">Goblin</option>
+            <option value="Elf">Elf</option>
+          </select>
+        </label>
+        <label>
           Sexuality
           <select id="playerSexuality" required>
             <option value="straight">Straight</option>
@@ -995,6 +1004,17 @@
             <option value="gay">Gay</option>
             <option value="lesbian">Lesbian</option>
           </select>
+        </label>
+        <label>
+          Starting location
+          <select id="playerStartMode" required>
+            <option value="random">Random location</option>
+            <option value="city">Choose a city</option>
+          </select>
+        </label>
+        <label id="playerStartCityLabel" hidden>
+          Starting city
+          <select id="playerStartCity"></select>
         </label>
         <label>
           Class
@@ -1009,12 +1029,10 @@
           Description
           <textarea id="playerDescription" rows="3" placeholder="Kind, friendly, unfriendly..."></textarea>
         </label>
-        <p>Choose up to three traits. A counter trait will be assigned randomly when you start. Positive traits add 2 to their stat checks; the counter trait subtracts 2. Strong/Weak and Resilient/Fragile also change max HP by 5.</p>
-        <div id="playerTraitOptions" class="trait-picker"></div>
-        <p id="traitSelectionStatus" class="trait-selection-status" aria-live="polite"></p>
+        <p>Your traits are generated automatically when you start.</p>
         <details class="trait-guide">
           <summary>What each trait does</summary>
-          <p>Descriptions affect starting relationships only. For your character, positive traits add 2 and the counter trait subtracts 2 from d20 checks using that stat. Traits that list HP also change your max HP.</p>
+          <p>Your traits and their stat modifiers are generated automatically. Traits that list HP also change your max HP.</p>
           <ul id="playerTraitGuideList" class="trait-guide-list"></ul>
         </details>
         <button type="submit" class="primary">Start Game</button>
@@ -1067,6 +1085,7 @@
         demonBargain: null,
         demonContracts: [],
         cities: [],
+        cityPopulationSeeded: false,
         quests: [],
         pendingQuest: null,
         turnCounter: 0,
@@ -1125,13 +1144,14 @@
         relationshipDialog: document.getElementById("relationshipDialog"),
         playerSetupDialog: document.getElementById("playerSetupDialog"),
         playerSetupForm: document.getElementById("playerSetupForm"),
-        playerTraitOptions: document.getElementById("playerTraitOptions"),
-        traitSelectionStatus: document.getElementById("traitSelectionStatus"),
         playerTraitGuideList: document.getElementById("playerTraitGuideList"),
         playerDescription: document.getElementById("playerDescription"),
         playerName: document.getElementById("playerName"),
         playerGender: document.getElementById("playerGender"),
         playerRace: document.getElementById("playerRace"),
+        playerStartMode: document.getElementById("playerStartMode"),
+        playerStartCityLabel: document.getElementById("playerStartCityLabel"),
+        playerStartCity: document.getElementById("playerStartCity"),
         playerAge: document.getElementById("playerAge"),
         playerSexuality: document.getElementById("playerSexuality"),
         playerClass: document.getElementById("playerClass"),
@@ -1558,7 +1578,7 @@
         throw new Error("Could not place a city on clear land after 12,000 attempts.");
       }
 
-      function seedCitiesAndPopulations() {
+      function generateCities() {
         if (state.cities.length) return;
         const groups = [
           { race: "Human", icon: "🏘️" },
@@ -1581,40 +1601,53 @@
               location: randomCityLocation(state.cities)
             };
             state.cities.push(city);
-            for (let residentNumber = 0; residentNumber < 20; residentNumber += 1) {
-              const gender = randomFrom(["male", "female"]);
-              const location = {
-                x: Math.max(0, Math.min(state.worldWidth, city.location.x + (Math.random() * 2 - 1) * 2)),
-                y: Math.max(0, Math.min(state.worldHeight, city.location.y + (Math.random() * 2 - 1) * 2))
-              };
-              addEntity({
-                name: `${randomFrom(givenNames)} ${randomFrom(cityNameEnds)}`,
-                type: group.race,
-                race: group.race,
-                gender,
-                sexuality: gender === "male" ? randomFrom(["straight", "bisexual", "gay"]) : randomFrom(["straight", "bisexual", "lesbian"]),
-                age: Math.floor(Math.random() * 50) + 18,
-                skinTone: group.race === "Human" ? randomFrom(["white", "black", "brown"]) : "",
-                icon: randomFrom(iconChoices(group.race, gender)),
-                description: `A resident of ${city.name}.`,
-                location,
-                cityId: city.id,
-                cityResident: true,
-                priority: "friendship",
-                money: Math.floor(Math.random() * 1001) + 200,
-                skipImageSearch: true
-              }, false);
-            }
+          }
+        });
+        elements.playerStartCity.innerHTML = state.cities.map((city) =>
+          `<option value="${escapeHtml(city.id)}">${escapeHtml(city.name)} (${escapeHtml(city.race)})</option>`
+        ).join("");
+      }
+
+      function seedCitiesAndPopulations() {
+        generateCities();
+        if (state.cityPopulationSeeded) return;
+        state.cityPopulationSeeded = true;
+        state.cities.forEach((city) => {
+          for (let residentNumber = 0; residentNumber < 20; residentNumber += 1) {
+            const gender = randomFrom(["male", "female"]);
+            const location = {
+              x: Math.max(0, Math.min(state.worldWidth, city.location.x + (Math.random() * 2 - 1) * 2)),
+              y: Math.max(0, Math.min(state.worldHeight, city.location.y + (Math.random() * 2 - 1) * 2))
+            };
+            addEntity({
+              name: `${randomFrom(givenNames)} ${randomFrom(cityNameEnds)}`,
+              type: city.race,
+              race: city.race,
+              gender,
+              sexuality: gender === "male" ? randomFrom(["straight", "bisexual", "gay"]) : randomFrom(["straight", "bisexual", "lesbian"]),
+              age: Math.floor(Math.random() * 50) + 18,
+              skinTone: city.race === "Human" ? randomFrom(["white", "black", "brown"]) : "",
+              icon: randomFrom(iconChoices(city.race, gender)),
+              description: `A resident of ${city.name}.`,
+              location,
+              cityId: city.id,
+              cityResident: true,
+              priority: "friendship",
+              money: Math.floor(Math.random() * 1001) + 200,
+              skipImageSearch: true
+            }, false);
           }
         });
         const player = currentPlayer();
         if (player) {
-          const nearestCity = state.cities
-            .map((city) => ({ city, distance: distanceBetween(player, city) }))
-            .sort((first, second) => first.distance - second.distance)[0]?.city;
-          if (nearestCity) {
-            player.location = { ...nearestCity.location };
-            player.cityId = nearestCity.id;
+          if (elements.playerStartMode.value === "city") {
+            const startCity = state.cities.find((city) => city.id === elements.playerStartCity.value) || randomFrom(state.cities);
+            player.location = { ...startCity.location };
+            player.cityId = startCity.id;
+          } else {
+            player.location = randomLocation();
+            while (cityAtLocation(player.location)) player.location = randomLocation();
+            player.cityId = "";
           }
         }
       }
@@ -1848,40 +1881,6 @@
         elements.playerTraitGuideList.innerHTML = traits.map((trait) =>
           `<li><strong>${escapeHtml(trait.name)}:</strong> ${escapeHtml(traitEffectText(trait))}</li>`
         ).join("");
-      }
-
-      function renderPlayerTraitOptions() {
-        const options = chooseRandomTraits(positiveTraits, 10);
-        elements.playerTraitOptions.innerHTML = options.map((trait) => `
-          <label class="trait-option">
-            <input type="checkbox" name="playerTrait" value="${escapeHtml(trait.name)}" />
-            <span><strong>${escapeHtml(trait.name)}</strong><small>${escapeHtml(traitEffectText(trait, true))}</small></span>
-          </label>
-        `).join("");
-        elements.playerTraitOptions.querySelectorAll('input[name="playerTrait"]').forEach((input) => {
-          input.addEventListener("change", updatePlayerTraitSelection);
-        });
-        updatePlayerTraitSelection();
-      }
-
-      function updatePlayerTraitSelection() {
-        const choices = Array.from(elements.playerTraitOptions.querySelectorAll('input[name="playerTrait"]'));
-        const selectedCount = choices.filter((input) => input.checked).length;
-        choices.forEach((input) => {
-          input.disabled = !input.checked && selectedCount >= 3;
-        });
-        elements.traitSelectionStatus.textContent = `${selectedCount}/3 traits selected.`;
-      }
-
-      function selectedPlayerTraits() {
-        return Array.from(elements.playerTraitOptions.querySelectorAll('input[name="playerTrait"]:checked'))
-          .map((input) => input.value);
-      }
-
-      function assignPlayerCounterTrait(traits) {
-        const excluded = new Set(traits.map((name) => getTrait(name)?.opposite).filter(Boolean));
-        const available = counterTraits.filter((trait) => !excluded.has(trait.name));
-        return randomFrom(available).name;
       }
 
       function makeId() {
@@ -3776,7 +3775,8 @@
       }
 
       function initializePlayer(playerDetails) {
-        const traits = [...playerDetails.traits, assignPlayerCounterTrait(playerDetails.traits)];
+        const generatedTraits = getCreatureTraits(playerDetails.race);
+        const traits = generatedTraits.traits;
         const description = String(playerDetails.description || "").trim() || "Player character.";
         const effects = getDescriptionEffects(description);
         const race = playerDetails.race;
@@ -3802,6 +3802,7 @@
           hatedKinds: parseHatedKinds(description),
           humanForm: false,
           traits,
+          traitModifiers: generatedTraits.modifiers,
           descriptionEffects: effects,
           hp,
           maxHp: hp,
@@ -4376,23 +4377,17 @@
           : /\brun(?:ning)?\b/i.test(actionText)
             ? "running"
             : "walking";
-        const thresholds = { walking: 5, running: 7, sprinting: 10 };
-        const roll = rollD20(actor, "agility");
         const distance = distanceBetween(actor, target);
         const pace = mode === "walking" ? 1 : mode === "running" ? 3 : Math.floor(Math.random() * 6) + 5;
         const verbs = { walking: "walks", running: "runs", sprinting: "sprints" };
         actor.turnUsed = true;
-        if (roll < thresholds[mode]) {
-          addLog(`<strong>${escapeHtml(actor.name)}</strong> fails to travel toward ${escapeHtml(target.name)} by ${mode} (needs ${thresholds[mode]}+, rolled ${roll}).`);
-        } else {
-          const traveled = Math.min(distance, pace);
-          if (distance > 0) {
-            const ratio = traveled / distance;
-            actor.location.x += (target.location.x - actor.location.x) * ratio;
-            actor.location.y += (target.location.y - actor.location.y) * ratio;
-          }
-          addLog(`<strong>${escapeHtml(actor.name)}</strong> ${verbs[mode]} ${traveled.toFixed(1)} km toward ${escapeHtml(target.name)} (d20: ${roll}).`);
+        const traveled = Math.min(distance, pace);
+        if (distance > 0) {
+          const ratio = traveled / distance;
+          actor.location.x += (target.location.x - actor.location.x) * ratio;
+          actor.location.y += (target.location.y - actor.location.y) * ratio;
         }
+        addLog(`<strong>${escapeHtml(actor.name)}</strong> ${verbs[mode]} ${traveled.toFixed(1)} km toward ${escapeHtml(target.name)}.`);
         finishActorTurn(actor, true);
         return true;
       }
@@ -5477,10 +5472,11 @@
         const startingDay = state.day;
         const startingRollNumber = diceRollNumber;
         const actionText = elements.actionText.value.trim() || "takes a bold action";
+        const isTravelAction = /\b(walk|walking|run|running|sprint|sprinting)\b.*\bto\b/i.test(actionText);
         resolveActionCore(event);
 
         if (!actor?.isPlayer) return;
-        if (diceRollNumber === startingRollNumber) {
+        if (!isTravelAction && diceRollNumber === startingRollNumber) {
           rollD20(actor, actionStat(actionText));
         }
         if (!state.pickpocket
@@ -5857,7 +5853,6 @@
             age,
             sexuality: elements.playerSexuality.value,
             characterClass: elements.playerClass.value,
-            traits: selectedPlayerTraits(),
             description: elements.playerDescription.value.trim()
           });
           elements.playerSetupDialog.close();
@@ -5879,6 +5874,9 @@
         });
         elements.playerGender.addEventListener("change", () => {
           updateSexualityOptions(elements.playerGender, elements.playerSexuality);
+        });
+        elements.playerStartMode.addEventListener("change", () => {
+          elements.playerStartCityLabel.hidden = elements.playerStartMode.value !== "city";
         });
         elements.openInventory.addEventListener("click", () => {
           renderInventory();
@@ -5917,9 +5915,9 @@
 
       function initialize() {
         setupEvents();
+        generateCities();
         updateSexualityOptions(elements.playerGender, elements.playerSexuality);
         renderTraitGuides();
-        renderPlayerTraitOptions();
         render();
         elements.playerSetupDialog.showModal();
         elements.playerName.focus();
