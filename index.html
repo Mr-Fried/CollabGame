@@ -849,155 +849,12 @@
 
       <main class="layout">
         <aside class="panel">
-          <h2>End-of-Turn Creation</h2>
-          <p id="creationPrompt">Finish your action to unlock your required creation choice.</p>
-          <div id="creationChoices" class="creation-choices" hidden>
-            <button type="button" id="chooseCreature" class="secondary">Make a Creature</button>
-            <button type="button" id="chooseObject" class="secondary">Make an Object</button>
-          </div>
-          <button type="button" id="skipCreation" class="ghost" hidden>Skip creation and end turn</button>
-          <form id="createForm" hidden>
-            <label>
-              Creature name
-              <input id="beingName" type="text" placeholder="Astra the Fox" required />
-            </label>
-
-            <label>
-              Creature kind
-              <input id="beingType" type="text" placeholder="Dragon, Bee, Robot, Spirit, etc." required />
-            </label>
-
-            <label>
-              Gender
-              <select id="beingGender">
-                <option value="unspecified">Unspecified</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-              </select>
-            </label>
-
-            <label>
-              Sexuality
-              <select id="beingSexuality">
-                <option value="straight">Straight</option>
-                <option value="bisexual">Bisexual</option>
-                <option value="gay">Gay</option>
-                <option value="lesbian">Lesbian</option>
-              </select>
-            </label>
-
-            <label id="humanFormLabel" class="checkbox-row" hidden>
-              <input id="beingHumanForm" type="checkbox" />
-              <span>This god has a human form</span>
-            </label>
-
-            <label>
-              Relationship status
-              <select id="beingRelationship">
-                <option value="unspecified">Not specified</option>
-                <option value="single">Single</option>
-                <option value="partnered">Has a partner</option>
-                <option value="not-interested">Not looking for romance</option>
-              </select>
-            </label>
-
-            <label>
-              Icon
-              <div class="icon-row">
-                <input id="beingIcon" type="text" maxlength="2" value="✨" aria-label="Creature icon" readonly />
-                <button type="button" id="randomIconBtn" class="mini">Random</button>
-              </div>
-            </label>
-
-            <label>
-              Description
-              <textarea id="beingDescription" rows="3" placeholder="Friendly, unfriendly, kind..."></textarea>
-            </label>
-            <label>
-              Spawn location
-              <select id="beingSpawnLocation">
-                <option value="random">Random anywhere on the map</option>
-                <option value="nearby">Within 2 km of me</option>
-              </select>
-            </label>
-            <label id="beingPriorityModeLabel" hidden>
-              Creature priority
-              <select id="beingPriorityMode">
-                <option value="random">Random priority</option>
-                <option value="choose">Choose priority</option>
-              </select>
-            </label>
-            <label id="beingPriorityLabel" hidden>
-              Priority
-              <select id="beingPriority">
-                <option value="combat">Combat</option>
-                <option value="survival">Survival</option>
-                <option value="friendship">Friendship</option>
-                <option value="exploration">Exploration</option>
-                <option value="building">Building</option>
-                <option value="trading">Trading</option>
-                <option value="murdering">Murdering (serial killer)</option>
-                <option value="manipulating">Manipulating others</option>
-                <option value="charming">Charming others</option>
-                <option value="crafting">Crafting items</option>
-                <option value="selling">Selling things in shops</option>
-              </select>
-            </label>
-            <details class="trait-guide">
-              <summary>How traits and descriptions affect gameplay</summary>
-              <p>Friendly or unfriendly wording in a description affects starting relationships. Traits are generated randomly for creatures. Creature trait modifier sizes are randomized and shown in each character's trait stats.</p>
-              <ul id="creatureTraitGuideList" class="trait-guide-list"></ul>
-            </details>
-
-            <button type="submit" class="primary">Create Creature and End Turn</button>
-          </form>
-          <form id="objectForm" hidden>
-            <label>
-              Object name
-              <input id="objectName" type="text" placeholder="The Moonlit Market" required />
-            </label>
-
-            <label>
-              Object type
-              <input id="objectType" type="text" placeholder="Shop, knife, potion, building..." required />
-            </label>
-
-            <label>
-              Object size
-              <select id="objectSize">
-                <option value="small">Small item</option>
-                <option value="large">Large construction (takes 1–5 turns)</option>
-              </select>
-            </label>
-
-            <label id="objectCategoryLabel">
-              Item type
-              <select id="objectCategory">
-                <option value="weapon">Weapon</option>
-                <option value="armor">Armor</option>
-              </select>
-              <small>Food is found by spending a turn searching, not created.</small>
-            </label>
-
-            <label class="checkbox-row">
-              <input id="objectInInventory" type="checkbox" />
-              <span>Add this small item to my inventory</span>
-            </label>
-
-            <label>
-              Icon
-              <input id="objectIcon" type="text" maxlength="2" value="📦" aria-label="Object icon" />
-            </label>
-
-            <label>
-              Description
-              <textarea id="objectDescription" rows="3" placeholder="A mysterious shop that appears at dusk..."></textarea>
-            </label>
-            <p>Weapons and tools must be crafted as a turn action using gathered resources. Building a shop or house also requires a hammer.</p>
-            <p id="objectRecipeInfo" class="equipment-summary" aria-live="polite"></p>
-
-            <button type="submit" class="primary">Create Object and End Turn</button>
-          </form>
+          <h2>Your Class</h2>
+          <p id="playerClassSummary">Choose a class when creating your character.</p>
+          <p id="playerMoney">Money: 0 coins</p>
+          <p id="currentCity">Outside a city</p>
+          <div id="questStatus" class="quest-status"></div>
+          <p>Summoning, healing, and sleeping together are turn actions. Animals cannot talk or socialize.</p>
         </aside>
 
         <section class="main-panel">
@@ -1017,6 +874,15 @@
               <label>
                 What do they do? Type a creature's name to talk to or attack it.
                 <input id="actionText" type="text" placeholder="Explore the ruins, or summon Netanyahu..." required />
+              </label>
+              <label>
+                Race
+                <select id="playerRace" required>
+                  <option value="Human">Human</option>
+                  <option value="Orc">Orc</option>
+                  <option value="Goblin">Goblin</option>
+                  <option value="Elf">Elf</option>
+                </select>
               </label>
 
               <p>Most actions require a d20 roll. Summon Netanyahu with 15+, then summon Gadi Eizenkot to challenge him. Voters need a charisma roll of 7+.</p>
@@ -1044,6 +910,25 @@
               </div>
               <div id="pickpocketLoot" hidden></div>
             </section>
+            </dialog>
+            <dialog id="questDialog" class="modal-dialog">
+              <form id="questForm" class="dialog-content">
+                <h2 id="questTitle">Quest</h2>
+                <p id="questMessage"></p>
+                <label id="questTaskLabel" hidden>
+                  Task
+                  <textarea id="questTask" rows="3" maxlength="240" placeholder="Describe the task"></textarea>
+                </label>
+                <label id="questAmountLabel" hidden>
+                  Coins
+                  <input id="questAmount" type="number" min="1" step="1" />
+                </label>
+                <div class="dialog-actions">
+                  <button type="submit" class="primary" id="questPrimaryButton">Accept</button>
+                  <button type="button" class="secondary" id="questNegotiateButton" hidden>Negotiate</button>
+                  <button type="button" class="ghost" id="questDeclineButton">Decline</button>
+                </div>
+              </form>
             </dialog>
             <dialog id="relationshipDialog" class="modal-dialog">
             <section id="relationshipEvent" class="dialog-content">
@@ -1112,6 +997,15 @@
           </select>
         </label>
         <label>
+          Class
+          <select id="playerClass" required>
+            <option value="fighter">Fighter — double normal damage, triple critical damage, +400 HP</option>
+            <option value="summoner">Summoner — summon up to 3 companions</option>
+            <option value="healer">Healer — restore health and build rapport</option>
+            <option value="wizard">Wizard / Witch — spellcasting coming later</option>
+          </select>
+        </label>
+        <label>
           Description
           <textarea id="playerDescription" rows="3" placeholder="Kind, friendly, unfriendly..."></textarea>
         </label>
@@ -1124,6 +1018,14 @@
           <ul id="playerTraitGuideList" class="trait-guide-list"></ul>
         </details>
         <button type="submit" class="primary">Start Game</button>
+      </form>
+    </dialog>
+    <dialog id="summonDialog" class="modal-dialog">
+      <form id="summonForm" class="dialog-content">
+        <h2>Summon Companions</h2>
+        <p id="summonLimitMessage"></p>
+        <div id="summonSlots"></div>
+        <button type="submit" class="primary">Summon companions</button>
       </form>
     </dialog>
     <dialog id="inventoryDialog" class="modal-dialog">
@@ -1139,8 +1041,8 @@
     <dialog id="mapDialog" class="modal-dialog">
       <section class="dialog-content">
         <h2>World Map</h2>
-        <p>Each interaction square is 500 meters. The illustrated map covers approximately 9,000 × 5,000 km; grid lines are simplified at this world-scale view.</p>
-        <svg id="worldMap" class="world-map" viewBox="0 0 9000 5000" role="img" aria-label="Illustrated map showing rivers, forests, and creature locations"></svg>
+        <p>Each interaction square is 500 meters. The illustrated map covers approximately 10,800 × 6,000 km; grid lines are simplified at this world-scale view. Gold markers show cities.</p>
+        <svg id="worldMap" class="world-map" viewBox="0 0 10800 6000" role="img" aria-label="Illustrated map showing rivers, forests, and creature locations"></svg>
         <div class="dialog-actions"><button type="button" class="ghost small" data-close-dialog="mapDialog">Close</button></div>
       </section>
     </dialog>
@@ -1154,8 +1056,7 @@
         currentIndex: 0,
         log: [],
         relationships: {},
-        pendingCreationActorId: null,
-        pendingCreationType: null,
+        pendingSummonerId: null,
         pickpocket: null,
         relationshipEvent: null,
         deferredTurnActorId: null,
@@ -1165,12 +1066,16 @@
         gadiElection: null,
         demonBargain: null,
         demonContracts: [],
+        cities: [],
+        quests: [],
+        pendingQuest: null,
         turnCounter: 0,
-        worldWidth: 9000,
-        worldHeight: 5000
+        worldWidth: 10800,
+        worldHeight: 6000
       };
 
       const MAP_SQUARE_KM = 0.5;
+      const CITY_RADIUS_KM = 4;
       let aiTurnTimer = null;
       let pickpocketClock = null;
       let pickpocketSliderTimer = null;
@@ -1181,36 +1086,6 @@
       let diceRollTimeout = null;
 
       const elements = {
-        createForm: document.getElementById("createForm"),
-        objectForm: document.getElementById("objectForm"),
-        creationPrompt: document.getElementById("creationPrompt"),
-        creationChoices: document.getElementById("creationChoices"),
-        chooseCreature: document.getElementById("chooseCreature"),
-        chooseObject: document.getElementById("chooseObject"),
-        skipCreation: document.getElementById("skipCreation"),
-        beingName: document.getElementById("beingName"),
-        beingType: document.getElementById("beingType"),
-        beingGender: document.getElementById("beingGender"),
-        beingSexuality: document.getElementById("beingSexuality"),
-        beingHumanForm: document.getElementById("beingHumanForm"),
-        humanFormLabel: document.getElementById("humanFormLabel"),
-        beingRelationship: document.getElementById("beingRelationship"),
-        beingIcon: document.getElementById("beingIcon"),
-        beingDescription: document.getElementById("beingDescription"),
-        beingSpawnLocation: document.getElementById("beingSpawnLocation"),
-        beingPriorityModeLabel: document.getElementById("beingPriorityModeLabel"),
-        beingPriorityMode: document.getElementById("beingPriorityMode"),
-        beingPriorityLabel: document.getElementById("beingPriorityLabel"),
-        beingPriority: document.getElementById("beingPriority"),
-        objectName: document.getElementById("objectName"),
-        objectType: document.getElementById("objectType"),
-        objectSize: document.getElementById("objectSize"),
-        objectCategory: document.getElementById("objectCategory"),
-        objectInInventory: document.getElementById("objectInInventory"),
-        objectIcon: document.getElementById("objectIcon"),
-        objectDescription: document.getElementById("objectDescription"),
-        objectRecipeInfo: document.getElementById("objectRecipeInfo"),
-        randomIconBtn: document.getElementById("randomIconBtn"),
         actionForm: document.getElementById("actionForm"),
         actionText: document.getElementById("actionText"),
         diceTray: document.getElementById("diceTray"),
@@ -1242,6 +1117,10 @@
         demonBargainTitle: document.getElementById("demonBargainTitle"),
         demonBargainMessage: document.getElementById("demonBargainMessage"),
         demonBargainRequest: document.getElementById("demonBargainRequest"),
+        summonDialog: document.getElementById("summonDialog"),
+        summonForm: document.getElementById("summonForm"),
+        summonSlots: document.getElementById("summonSlots"),
+        summonLimitMessage: document.getElementById("summonLimitMessage"),
         pickpocketDialog: document.getElementById("pickpocketDialog"),
         relationshipDialog: document.getElementById("relationshipDialog"),
         playerSetupDialog: document.getElementById("playerSetupDialog"),
@@ -1249,19 +1128,35 @@
         playerTraitOptions: document.getElementById("playerTraitOptions"),
         traitSelectionStatus: document.getElementById("traitSelectionStatus"),
         playerTraitGuideList: document.getElementById("playerTraitGuideList"),
-        creatureTraitGuideList: document.getElementById("creatureTraitGuideList"),
         playerDescription: document.getElementById("playerDescription"),
         playerName: document.getElementById("playerName"),
         playerGender: document.getElementById("playerGender"),
+        playerRace: document.getElementById("playerRace"),
         playerAge: document.getElementById("playerAge"),
         playerSexuality: document.getElementById("playerSexuality"),
+        playerClass: document.getElementById("playerClass"),
+        playerClassSummary: document.getElementById("playerClassSummary"),
+        playerMoney: document.getElementById("playerMoney"),
+        currentCity: document.getElementById("currentCity"),
+        questStatus: document.getElementById("questStatus"),
         inventoryDialog: document.getElementById("inventoryDialog"),
         equipmentSummary: document.getElementById("equipmentSummary"),
         resourceList: document.getElementById("resourceList"),
         openInventory: document.getElementById("openInventory"),
         mapBtn: document.getElementById("mapBtn"),
         mapDialog: document.getElementById("mapDialog"),
-        worldMap: document.getElementById("worldMap")
+        worldMap: document.getElementById("worldMap"),
+        questDialog: document.getElementById("questDialog"),
+        questForm: document.getElementById("questForm"),
+        questTitle: document.getElementById("questTitle"),
+        questMessage: document.getElementById("questMessage"),
+        questTaskLabel: document.getElementById("questTaskLabel"),
+        questTask: document.getElementById("questTask"),
+        questAmountLabel: document.getElementById("questAmountLabel"),
+        questAmount: document.getElementById("questAmount"),
+        questPrimaryButton: document.getElementById("questPrimaryButton"),
+        questNegotiateButton: document.getElementById("questNegotiateButton"),
+        questDeclineButton: document.getElementById("questDeclineButton")
       };
 
       function randomFrom(list) {
@@ -1568,6 +1463,25 @@
         };
       }
 
+      function currentPlayer() {
+        return state.entities.find((entity) => entity.isPlayer) || null;
+      }
+
+      function cityAtLocation(location) {
+        return state.cities.find((city) => distanceBetween({ location }, { location: city.location }) <= CITY_RADIUS_KM) || null;
+      }
+
+      function isEntityVisibleToPlayer(entity) {
+        if (!entity.cityId || entity.isPlayer) return true;
+        const player = currentPlayer();
+        if (cityAtLocation(entity.location)?.id !== entity.cityId) return true;
+        return Boolean(player && cityAtLocation(player.location)?.id === entity.cityId);
+      }
+
+      function visibleEntities() {
+        return state.entities.filter(isEntityVisibleToPlayer);
+      }
+
       function creatureSpawnLocation(creator, spawnMode) {
         if (spawnMode !== "nearby" || !creator?.location) return randomLocation();
         const angle = Math.random() * Math.PI * 2;
@@ -1601,6 +1515,108 @@
 
       function canTeleport(entity) {
         return /\b(gods?|goddesses|deities|demons?|devils?|angels?)\b/i.test(entity.type || "");
+      }
+
+      const landPolygons = [
+        [[0, 4], [5, 3], [9, 5], [14, 3], [18, 4], [21, 7], [27, 6], [31, 9], [36, 8], [40, 11], [43, 10], [47, 14], [46, 18], [49, 21], [46, 25], [48, 29], [44, 32], [46, 36], [43, 40], [39, 41], [36, 45], [31, 44], [28, 47], [23, 45], [18, 47], [14, 44], [10, 45], [8, 41], [4, 40], [2, 36], [0, 35]],
+        [[53, 3], [58, 4], [61, 7], [66, 6], [70, 8], [75, 7], [79, 10], [85, 9], [89, 13], [90, 17], [87, 20], [89, 24], [85, 27], [86, 32], [82, 34], [80, 39], [76, 38], [72, 42], [67, 40], [63, 43], [58, 41], [56, 37], [52, 36], [54, 31], [51, 27], [54, 23], [52, 18], [55, 15], [52, 11]]
+      ];
+      const forestCenters = [[13, 12], [16, 13], [18, 11], [14, 16], [19, 16], [23, 14], [26, 16], [70, 29], [73, 31], [76, 28], [79, 33], [75, 36], [82, 30]];
+      const cityNameStarts = ["Alder", "Bright", "Cedar", "Dawn", "Eagle", "Fair", "Gold", "Haven", "Iron", "Juniper", "Kings", "Lumen", "Moon", "North", "Oak", "Pine", "Quiet", "River", "Silver", "Thorn"];
+      const cityNameEnds = ["bay", "bridge", "crest", "fall", "field", "ford", "gate", "haven", "meadow", "mere", "reach", "rest", "ridge", "rock", "shore", "stead", "vale", "watch", "wick", "wood"];
+      const givenNames = ["Ari", "Bryn", "Cato", "Dara", "Eli", "Fara", "Galen", "Hana", "Ivo", "Jori", "Kira", "Lio", "Mira", "Niko", "Orin", "Pia", "Quin", "Rhea", "Soren", "Tavi", "Uma", "Vera", "Wren", "Yara", "Zane"];
+
+      function pointInPolygon(x, y, polygon) {
+        let inside = false;
+        for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index, index += 1) {
+          const [currentX, currentY] = polygon[index];
+          const [previousX, previousY] = polygon[previous];
+          const intersects = ((currentY > y) !== (previousY > y))
+            && (x < ((previousX - currentX) * (y - currentY)) / (previousY - currentY) + currentX);
+          if (intersects) inside = !inside;
+        }
+        return inside;
+      }
+
+      function isForestLocation(x, y) {
+        return forestCenters.some(([forestX, forestY]) => Math.hypot(x - forestX, y - forestY) < 4.5);
+      }
+
+      function isLakeLocation(x, y) {
+        return ((x - 34) / 4.5) ** 2 + ((y - 34) / 2.3) ** 2 < 1;
+      }
+
+      function randomCityLocation(existingCities) {
+        for (let attempt = 0; attempt < 12000; attempt += 1) {
+          const x = Math.random() * 90;
+          const y = Math.random() * 50;
+          if (!landPolygons.some((polygon) => pointInPolygon(x, y, polygon))
+            || isForestLocation(x, y) || isLakeLocation(x, y)
+            || existingCities.some((city) => Math.hypot(city.location.x / 120 - x, city.location.y / 120 - y) < 5)) continue;
+          return { x: x * 120, y: y * 120 };
+        }
+        throw new Error("Could not place a city on clear land after 12,000 attempts.");
+      }
+
+      function seedCitiesAndPopulations() {
+        if (state.cities.length) return;
+        const groups = [
+          { race: "Human", icon: "🏘️" },
+          { race: "Orc", icon: "🛖" },
+          { race: "Goblin", icon: "🏚️" }
+        ];
+        const names = new Set();
+        groups.forEach((group) => {
+          for (let cityNumber = 0; cityNumber < 10; cityNumber += 1) {
+            let name;
+            do {
+              name = `${randomFrom(cityNameStarts)}${randomFrom(cityNameEnds)}`;
+            } while (names.has(name));
+            names.add(name);
+            const city = {
+              id: makeId(),
+              name,
+              race: group.race,
+              icon: group.icon,
+              location: randomCityLocation(state.cities)
+            };
+            state.cities.push(city);
+            for (let residentNumber = 0; residentNumber < 20; residentNumber += 1) {
+              const gender = randomFrom(["male", "female"]);
+              const location = {
+                x: Math.max(0, Math.min(state.worldWidth, city.location.x + (Math.random() * 2 - 1) * 2)),
+                y: Math.max(0, Math.min(state.worldHeight, city.location.y + (Math.random() * 2 - 1) * 2))
+              };
+              addEntity({
+                name: `${randomFrom(givenNames)} ${randomFrom(cityNameEnds)}`,
+                type: group.race,
+                race: group.race,
+                gender,
+                sexuality: gender === "male" ? randomFrom(["straight", "bisexual", "gay"]) : randomFrom(["straight", "bisexual", "lesbian"]),
+                age: Math.floor(Math.random() * 50) + 18,
+                skinTone: group.race === "Human" ? randomFrom(["white", "black", "brown"]) : "",
+                icon: randomFrom(iconChoices(group.race, gender)),
+                description: `A resident of ${city.name}.`,
+                location,
+                cityId: city.id,
+                cityResident: true,
+                priority: "friendship",
+                money: Math.floor(Math.random() * 1001) + 200,
+                skipImageSearch: true
+              }, false);
+            }
+          }
+        });
+        const player = currentPlayer();
+        if (player) {
+          const nearestCity = state.cities
+            .map((city) => ({ city, distance: distanceBetween(player, city) }))
+            .sort((first, second) => first.distance - second.distance)[0]?.city;
+          if (nearestCity) {
+            player.location = { ...nearestCity.location };
+            player.cityId = nearestCity.id;
+          }
+        }
       }
 
       function isDemon(entity) {
@@ -1803,6 +1819,11 @@
           .test(`${entity.name} ${entity.type}`);
       }
 
+      function isAnimal(entity) {
+        return /\b(animals?|alligators?|amphibians?|ants?|badgers?|bats?|bears?|bees?|beetles?|birds?|bison|boars?|buffalo|butterflies|camels?|caterpillars?|cats?|cattle|cheetahs?|chickens?|crocodiles?|cows?|crabs?|coyotes?|deer|dogs?|dolphins?|donkeys?|ducks?|eagles?|elephants?|fish|flies|foxes?|frogs?|geese|goats?|grasshoppers?|hares?|hawks?|horses?|hyenas?|insects?|kangaroos?|koalas?|leopards?|lions?|lizards?|lobsters?|lambs?|mice|monkeys?|mosquitoes?|moths?|mules?|octopuses?|otters?|owls?|pandas?|panthers?|parrots?|pigs?|pigeons?|pumas?|rabbits?|raccoons?|rats?|ravens?|salmon|salamanders?|scorpions?|seals?|sharks?|sheep|skunks?|slugs?|snails?|snakes?|sparrows?|spiders?|squirrels?|tigers?|toads?|trout|turkeys?|turtles?|wasps?|weasels?|whales?|worms?|wolves?|zebras?)\b/i
+          .test(`${entity.name} ${entity.type}`);
+      }
+
       function yieldsLeather(entity) {
         return /\b(cows?|sheep|lambs?|bears?|horses?|donkeys?|mules?|goats?|pigs?|boars?|deer|buffalo|bison)\b/i
           .test(`${entity.name} ${entity.type}`);
@@ -1824,11 +1845,9 @@
 
       function renderTraitGuides() {
         const traits = [...positiveTraits, ...counterTraits];
-        [elements.playerTraitGuideList, elements.creatureTraitGuideList].forEach((list) => {
-          list.innerHTML = traits.map((trait) =>
-            `<li><strong>${escapeHtml(trait.name)}:</strong> ${escapeHtml(traitEffectText(trait))}</li>`
-          ).join("");
-        });
+        elements.playerTraitGuideList.innerHTML = traits.map((trait) =>
+          `<li><strong>${escapeHtml(trait.name)}:</strong> ${escapeHtml(traitEffectText(trait))}</li>`
+        ).join("");
       }
 
       function renderPlayerTraitOptions() {
@@ -1880,8 +1899,8 @@
         if (/\b(gods?|goddesses|deity|deities)\b/.test(description)) {
           return 1000;
         }
-        if (/\b(humans?|person|people)\b/.test(description)) {
-          return 50;
+        if (/\b(humans?|person|people|orcs?|goblins?|elves?|elf)\b/.test(description)) {
+          return 150;
         }
         if (/\b(wolves|wolf|lions?|tigers?|bears?|hyenas?|leopards?|panthers?|crocodiles?|alligators?|sharks?|cougars?|cheetahs?|lynxes|boars?)\b/.test(description)) {
           return 100;
@@ -1890,6 +1909,10 @@
           return Math.floor(Math.random() * 201) + 100;
         }
         return 100;
+      }
+
+      function raceHasFixedHealth(type) {
+        return /\b(humans?|person|people|orcs?|goblins?|elves?|elf)\b/i.test(type || "");
       }
 
       function generateAvatarData(entity) {
@@ -1937,6 +1960,11 @@
       }
 
       function addLog(message, entity = null) {
+        const activeEntity = state.entities[state.currentIndex];
+        const player = currentPlayer();
+        if (entity?.cityResident && !isEntityVisibleToPlayer(entity)) return;
+        if (activeEntity?.cityResident && !isEntityVisibleToPlayer(activeEntity)
+          && (!player || !message.includes(escapeHtml(player.name)))) return;
         state.log.unshift({ id: Date.now() + Math.random(), message, image: entity ? entity.image : "", icon: entity ? entity.icon : "", entityId: entity ? entity.id : "" });
         if (state.log.length > 25) {
           state.log.pop();
@@ -1967,7 +1995,9 @@
       }
 
       function isRomanceEligible(entity) {
-        const kind = entity.type.toLowerCase().replace(/[-_]/g, " ").trim();
+        if (Number.isFinite(entity.age) && entity.age < 18) return false;
+        const kind = (entity.isPlayer ? "human" : entity.race || entity.type)
+          .toLowerCase().replace(/[-_]/g, " ").trim();
         if (/^(humans?|goblins?|orcs?|demons?|angels?)$/.test(kind)) return true;
         return entity.humanForm
           && /^(?:(?:human form )?(?:gods?|goddesses|deities)|(?:gods?|goddesses|deities) in human form)$/.test(kind);
@@ -1986,6 +2016,7 @@
 
       function canFormPlayerRelationship(candidate, player) {
         return candidate.relationshipStatus !== "not-interested"
+          && isRomanceEligible(player)
           && isRomanceEligible(candidate)
           && (player.sexuality !== "gay" || candidate.sexuality === "gay")
           && (player.sexuality !== "lesbian" || candidate.sexuality === "lesbian")
@@ -2040,6 +2071,8 @@
           addLog(`<strong>${escapeHtml(entity.name)}</strong> brings you a ${escapeHtml(gift.name)}.`);
         });
 
+        resolveOvernightEvents();
+
         if (state.pendingProposal && state.pendingProposal.dueDay <= state.day) {
           const candidate = state.entities.find((entity) => entity.id === state.pendingProposal.candidateId);
           state.pendingProposal = null;
@@ -2058,6 +2091,9 @@
         if (/\b(human|person|people)\b/.test(normalizedType)) {
           return gender === "male" ? ["👨", "🧔", "👨‍🦱", "👨‍🦰"] : gender === "female" ? ["👩", "👩‍🦱", "👩‍🦰"] : ["👤"];
         }
+        if (/\borc\b/.test(normalizedType)) return gender === "female" ? ["🧝‍♀️", "👩‍🦰"] : ["👹", "🧌"];
+        if (/\bgoblin\b/.test(normalizedType)) return ["👺", "🧌"];
+        if (/\b(elves?|elf)\b/.test(normalizedType)) return gender === "female" ? ["🧝‍♀️", "👸"] : ["🧝", "🧙"];
         if (/\b(bee|insect|ant|butterfly|beetle|wasp)\b/.test(normalizedType)) return ["🐝", "🐜", "🦋", "🪲"];
         if (/\b(wolf|fox|lion|tiger|bear|animal|dog|cat)\b/.test(normalizedType)) return ["🐺", "🦊", "🦁", "🐯", "🐻", "🐶", "🐱"];
         if (/\b(dragon)\b/.test(normalizedType)) return ["🐉", "🐲"];
@@ -2066,17 +2102,13 @@
         return ["✨", "🧙", "🧿", "🎭", "🌿", "🔥", "💎"];
       }
 
-      function updateCreatureIcon() {
-        elements.beingIcon.value = randomFrom(iconChoices(elements.beingType.value, elements.beingGender.value));
-      }
-
       function finishRelationshipEvent() {
         const actorId = state.deferredTurnActorId;
         state.deferredTurnActorId = null;
         state.relationshipEvent = null;
         render();
         const actor = state.entities.find((entity) => entity.id === actorId);
-        if (actor && actor.hp > 0) beginTurnCreation(actor);
+        if (actor && actor.hp > 0) finishActorTurn(actor, true);
         else scheduleAiTurn();
       }
 
@@ -2092,6 +2124,204 @@
         second.partnerId = null;
         first.relationshipStatus = "single";
         second.relationshipStatus = "single";
+      }
+
+      function isOppositeGenderPair(first, second) {
+        return (first.gender === "male" && second.gender === "female")
+          || (first.gender === "female" && second.gender === "male");
+      }
+
+      function isHumanType(type) {
+        return /\b(humans?|person|people)\b/i.test(type);
+      }
+
+      function createChild(firstParent, secondParent, options = {}) {
+        const firstRace = firstParent.race || (firstParent.isPlayer ? "Human" : firstParent.type);
+        const secondRace = secondParent.race || (secondParent.isPlayer ? "Human" : secondParent.type);
+        const type = randomFrom([firstRace, secondRace]);
+        const gender = randomFrom(["male", "female"]);
+        const name = randomFrom(["Ari", "Alex", "Casey", "Jamie", "Jordan", "Morgan", "Riley", "Sam"]);
+        const child = addEntity({
+          name: `${name} (${firstParent.name} and ${secondParent.name}'s child)`,
+          type,
+          gender,
+          sexuality: "straight",
+          age: 1,
+          icon: randomFrom(iconChoices(type, gender)),
+          skinTone: isHumanType(type) ? randomFrom(["white", "black", "brown"]) : "",
+          isChild: true,
+          parentIds: [firstParent.id, secondParent.id],
+          motherId: firstParent.gender === "female" ? firstParent.id : secondParent.id,
+          fatherId: firstParent.gender === "male" ? firstParent.id : secondParent.id,
+          betrayedPartnerId: options.betrayedPartnerId || "",
+          affairParentId: options.affairParentId || ""
+        }, true);
+        addLog(`<strong>${escapeHtml(child.name)}</strong> is born. They are ${isHumanType(type) ? `${child.skinTone}-skinned ` : ""}a ${escapeHtml(type)}, inheriting one parent's race.`);
+        return child;
+      }
+
+      function childLooksDifferentFrom(child, parent) {
+        const parentRace = parent.race || (parent.isPlayer ? "Human" : parent.type);
+        return child.type.toLowerCase() !== parentRace.toLowerCase()
+          || (isHumanType(child.type) && child.skinTone && parent.skinTone && child.skinTone !== parent.skinTone);
+      }
+
+      function startPlayerInfidelityConfrontation(player, partner, child = null) {
+        if (!player || !partner) return;
+        const childText = child
+          ? ` Their child, ${child.name}, has a different race or appearance, so the affair is clear.`
+          : "";
+        state.relationshipEvent = {
+          title: `${partner.name} is confronted`,
+          message: `${partner.name} was unfaithful.${childText} What do you want to do?`,
+          choices: [
+            {
+              label: "Forgive them",
+              action: () => {
+                changeRapport(player.id, partner.id, 10);
+                changeRapport(partner.id, player.id, 10);
+                if (child) child.affairDiscovered = true;
+                addLog(`<strong>${escapeHtml(player.name)}</strong> forgives ${escapeHtml(partner.name)}. They remain partners, but this could happen again.`);
+                finishRelationshipEvent();
+              }
+            },
+            {
+              label: "Break up",
+              action: () => {
+                endRelationship(player, partner);
+                if (child) child.affairDiscovered = true;
+                addLog(`<strong>${escapeHtml(player.name)}</strong> ends the relationship with ${escapeHtml(partner.name)}.`);
+                finishRelationshipEvent();
+              }
+            },
+            {
+              label: "Fight",
+              action: () => {
+                const playerRoll = rollD20(player, "strength");
+                const partnerRoll = rollD20(partner, "strength");
+                if (playerRoll > partnerRoll) {
+                  state.relationshipEvent = {
+                    title: "You win the fight",
+                    message: `You beat ${partner.name}. Decide whether to kill or spare them.`,
+                    choices: [
+                      {
+                        label: "Kill them",
+                        action: () => {
+                          applyDamage(partner, partner.hp, "is killed by the fight");
+                          endRelationship(player, partner);
+                          if (child) child.affairDiscovered = true;
+                          finishRelationshipEvent();
+                        }
+                      },
+                      {
+                        label: "Spare them",
+                        action: () => {
+                          applyDamage(partner, Math.max(1, Math.ceil(partner.maxHp * 0.1)), "is hurt in the fight");
+                          endRelationship(player, partner);
+                          if (child) child.affairDiscovered = true;
+                          finishRelationshipEvent();
+                        }
+                      }
+                    ]
+                  };
+                  render();
+                } else {
+                  const spared = partner.gender === "female" && Math.random() < 0.5;
+                  if (spared) {
+                    applyDamage(player, Math.max(1, Math.ceil(player.maxHp * 0.1)), "is hurt in the fight");
+                    addLog(`<strong>${escapeHtml(partner.name)}</strong> wins but chooses to spare you.`);
+                  } else {
+                    applyDamage(player, player.hp, "is killed in the fight");
+                    addLog(`<strong>${escapeHtml(partner.name)}</strong> wins the fight and does not spare you.`);
+                  }
+                  endRelationship(player, partner);
+                  if (child) child.affairDiscovered = true;
+                  finishRelationshipEvent();
+                }
+              }
+            }
+          ]
+        };
+        render();
+      }
+
+      function revealAffairChild(child, betrayedPartner) {
+        if (!child || !betrayedPartner || !childLooksDifferentFrom(child, betrayedPartner)) return;
+        child.affairDiscovered = true;
+        if (betrayedPartner.isPlayer) {
+          startPlayerInfidelityConfrontation(betrayedPartner, state.entities.find((entity) => entity.id === betrayedPartner.partnerId), child);
+          return;
+        }
+        const affairParent = state.entities.find((entity) => entity.id === child.affairParentId);
+        if (affairParent) setHostile(betrayedPartner, affairParent);
+        const partner = state.entities.find((entity) => entity.id === betrayedPartner.partnerId);
+        if (partner) endRelationship(betrayedPartner, partner);
+        addLog(`<strong>${escapeHtml(betrayedPartner.name)}</strong> realizes ${escapeHtml(child.name)} is not their child and confronts their partner.`);
+      }
+
+      function resolveOvernightEvents() {
+        const player = state.entities.find((entity) => entity.isPlayer);
+        const aiBeings = state.entities.filter((entity) => !entity.isPlayer && entity.hp > 0);
+        const availablePairs = [];
+        for (let firstIndex = 0; firstIndex < aiBeings.length; firstIndex += 1) {
+          for (let secondIndex = firstIndex + 1; secondIndex < aiBeings.length; secondIndex += 1) {
+            const first = aiBeings[firstIndex];
+            const second = aiBeings[secondIndex];
+            if (isOppositeGenderPair(first, second)
+              && isRomanceEligible(first) && isRomanceEligible(second)
+              && sameMapSquare(first, second)
+              && getRapport(first.id, second.id) >= 30 && getRapport(second.id, first.id) >= 30) {
+              availablePairs.push([first, second]);
+            }
+          }
+        }
+        if (availablePairs.length && Math.random() < 0.1) {
+          const [first, second] = randomFrom(availablePairs);
+          addLog(`<strong>${escapeHtml(first.name)}</strong> and <strong>${escapeHtml(second.name)}</strong> spend a private night together.`);
+          if (Math.random() < 0.5) {
+            createChild(first, second);
+            addLog(`Both parents are happy with their private time together.`);
+          } else {
+            addLog(`They enjoyed their private time together, but no child is born.`);
+          }
+        }
+
+        const femalePartners = state.entities.filter((entity) =>
+          !entity.isPlayer && entity.gender === "female" && entity.partnerId && entity.hp > 0 && isRomanceEligible(entity)
+        );
+        femalePartners.forEach((partner) => {
+          const betrayedPartner = state.entities.find((entity) => entity.id === partner.partnerId && entity.hp > 0);
+          if (!betrayedPartner || !isOppositeGenderPair(partner, betrayedPartner)
+            || getRapport(partner.id, betrayedPartner.id) > 50
+            || partner.lastAffairDay === state.day
+            || Math.random() >= 0.1) return;
+          const affairPartner = randomFrom(state.entities.filter((entity) =>
+            entity.id !== partner.id && entity.id !== betrayedPartner.id && entity.hp > 0
+            && entity.gender === "male" && isRomanceEligible(entity) && sameMapSquare(entity, partner)
+          ));
+          if (!affairPartner) return;
+          partner.lastAffairDay = state.day;
+          addLog(`<strong>${escapeHtml(partner.name)}</strong> secretly spends the night with ${escapeHtml(affairPartner.name)}.`);
+          if (Math.random() < 0.5) {
+            const child = createChild(partner, affairPartner, {
+              betrayedPartnerId: betrayedPartner.id,
+              affairParentId: affairPartner.id
+            });
+            revealAffairChild(child, betrayedPartner);
+          }
+        });
+
+        if (player?.partnerId) {
+          const partner = state.entities.find((entity) => entity.id === player.partnerId && entity.hp > 0);
+          if (partner?.gender === "female" && getRapport(partner.id, player.id) <= 50
+            && partner.lastAffairDay === state.day) {
+            const child = state.entities.find((entity) => entity.betrayedPartnerId === player.id
+              && entity.affairParentId && !entity.affairDiscovered);
+            if (child && childLooksDifferentFrom(child, player)) {
+              revealAffairChild(child, player);
+            }
+          }
+        }
       }
 
       function offerRelationship(candidate, player, secondAsk = false) {
@@ -2125,8 +2355,8 @@
             label: `Yes, be partners with ${candidate.name}`,
             action: () => {
               establishRelationship(player, candidate);
-              state.relationships[relationshipKey(candidate.id, player.id)] = Math.max(90, getRapport(candidate.id, player.id));
-              state.relationships[relationshipKey(player.id, candidate.id)] = Math.max(90, getRapport(player.id, candidate.id));
+              state.relationships[relationshipKey(candidate.id, player.id)] = 100;
+              state.relationships[relationshipKey(player.id, candidate.id)] = 100;
               addLog(`<strong>${escapeHtml(player.name)}</strong> and <strong>${escapeHtml(candidate.name)}</strong> become partners.`);
               finishRelationshipEvent();
             }
@@ -2296,8 +2526,6 @@
       }
 
       function ensureTurnPointer() {
-        if (state.pendingCreationActorId) return;
-
         if (!state.entities.length) {
           state.currentIndex = 0;
           return;
@@ -2322,12 +2550,14 @@
         elements.turnOrder.innerHTML = "";
 
         if (!state.entities.length) {
-          elements.turnOrder.innerHTML = '<div class="empty-state">No beings yet. Create one to start the story.</div>';
+          elements.turnOrder.innerHTML = '<div class="empty-state">Create your character to start the story.</div>';
           elements.roundBadge.textContent = `Day ${state.day}`;
           return;
         }
 
-        state.entities.forEach((entity, index) => {
+        const shownEntities = visibleEntities();
+        shownEntities.forEach((entity) => {
+          const index = state.entities.indexOf(entity);
           const item = document.createElement("div");
           item.className = `turn-item ${index === state.currentIndex ? "active" : ""} ${entity.turnUsed ? "used" : ""}`;
 
@@ -2378,7 +2608,16 @@
           return;
         }
 
-        state.entities.forEach((entity, index) => {
+        const shownEntities = visibleEntities();
+        if (shownEntities.length < state.entities.length) {
+          const hiddenCount = state.entities.length - shownEntities.length;
+          const hiddenSummary = document.createElement("div");
+          hiddenSummary.className = "empty-state";
+          hiddenSummary.textContent = `${hiddenCount} residents in distant cities are out of sight.`;
+          elements.entityList.appendChild(hiddenSummary);
+        }
+        shownEntities.forEach((entity) => {
+          const index = state.entities.indexOf(entity);
           const card = document.createElement("article");
           card.className = `entity-card ${index === state.currentIndex ? "active" : ""} ${entity.turnUsed ? "used" : ""}`;
 
@@ -2617,6 +2856,12 @@
           badges.appendChild(kind);
           badges.appendChild(statusBadge);
           badges.appendChild(roundBadge);
+          if (entity.skinTone) {
+            const skinToneBadge = document.createElement("span");
+            skinToneBadge.className = "mini-badge";
+            skinToneBadge.textContent = `Skin: ${entity.skinTone}`;
+            badges.appendChild(skinToneBadge);
+          }
 
           if (entity.busyTurns > 0) {
             const constructionBadge = document.createElement("span");
@@ -2648,7 +2893,7 @@
             badges.appendChild(obedienceBadge);
           }
 
-          const otherEntities = state.entities.filter((being) => being.id !== entity.id);
+          const otherEntities = shownEntities.filter((being) => being.id !== entity.id);
           let relationshipsToggle = null;
           let relationshipsPanel = null;
           let relationshipList = null;
@@ -2752,38 +2997,24 @@
         });
 
         const activeEntity = state.entities[state.currentIndex];
-        const playerTurn = Boolean(activeEntity && activeEntity.isPlayer && activeEntity.hp > 0 && !activeEntity.turnUsed && !state.pickpocket && !state.relationshipEvent);
-        const waitingForCreation = Boolean(activeEntity && state.pendingCreationActorId === activeEntity.id);
-        elements.turnPrompt.textContent = waitingForCreation
-          ? "Choose a creature or object to finish your turn."
-          : activeEntity && activeEntity.isPlayer && activeEntity.hp <= 0
+        const playerTurn = Boolean(activeEntity && activeEntity.isPlayer && activeEntity.hp > 0 && !activeEntity.turnUsed && !state.pickpocket && !state.relationshipEvent && !state.pendingSummonerId && !state.pendingQuest);
+        elements.turnPrompt.textContent = activeEntity && activeEntity.isPlayer && activeEntity.hp <= 0
             ? "You have been defeated."
-          : playerTurn ? "Your turn" : activeEntity ? `${activeEntity.name} is taking a turn...` : "No active turn";
+          : playerTurn ? "Your turn" : activeEntity && !isEntityVisibleToPlayer(activeEntity)
+            ? "Distant city residents are taking their turns..."
+            : activeEntity ? `${activeEntity.name} is taking a turn...` : "No active turn";
         elements.actionForm.classList.toggle("turn-controls-disabled", !playerTurn);
         Array.from(elements.actionForm.elements).forEach((control) => {
           control.disabled = !playerTurn;
         });
-        elements.newRoundBtn.disabled = Boolean(state.pendingCreationActorId || state.pickpocket || state.relationshipEvent || state.entities.some((entity) => entity.busyTurns > 0) || (activeEntity && activeEntity.isPlayer && activeEntity.hp <= 0));
-        renderCreationPanel();
+        elements.newRoundBtn.disabled = Boolean(state.pickpocket || state.relationshipEvent || elements.summonDialog.open || elements.questDialog.open || state.entities.some((entity) => entity.busyTurns > 0) || (activeEntity && activeEntity.isPlayer && activeEntity.hp <= 0));
         renderPickpocketPanel();
         renderRelationshipEvent();
-      }
-
-      function renderCreationPanel() {
-        const actor = state.entities.find((entity) => entity.id === state.pendingCreationActorId);
-        const playerChoosing = Boolean(actor && actor.isPlayer);
-        const choosingCreature = state.pendingCreationType === "creature";
-        const choosingObject = state.pendingCreationType === "object";
-
-        elements.creationPrompt.textContent = playerChoosing
-          ? `${actor.name}, choose what to create to finish your turn.`
-          : state.entities.some((entity) => entity.isPlayer && entity.hp <= 0)
-            ? "You have been defeated."
-          : "Finish your action to unlock your required creation choice.";
-        elements.creationChoices.hidden = !playerChoosing || Boolean(state.pendingCreationType);
-        elements.createForm.hidden = !playerChoosing || !choosingCreature;
-        elements.objectForm.hidden = !playerChoosing || !choosingObject;
-        elements.skipCreation.hidden = !playerChoosing;
+        renderQuestStatus();
+        const player = currentPlayer();
+        elements.playerMoney.textContent = `Money: ${(player?.money || 0).toLocaleString()} coins`;
+        const city = player && cityAtLocation(player.location);
+        elements.currentCity.textContent = city ? `In ${city.name}` : "Outside a city";
       }
 
       function renderObjectList() {
@@ -2909,12 +3140,15 @@
           <text class="map-terrain-label" x="30" y="39">MIRROR LAKE</text>
           <text x="4" y="6" font-size="1.5" fill="#e6f4f1">N ↑</text>
         `;
-        const markers = state.entities.map((entity) => {
+        const markers = visibleEntities().map((entity) => {
           const x = entity.location.x;
           const y = entity.location.y;
           return `<g><title>${escapeHtml(entity.name)} — ${escapeHtml(entity.type)} (${Math.floor(x / MAP_SQUARE_KM)}, ${Math.floor(y / MAP_SQUARE_KM)} grid square)</title><circle cx="${x}" cy="${y}" r="45" fill="${entity.isPlayer ? "#22c1ff" : "#8b5cf6"}" stroke="#edf3ff" stroke-width="8"></circle><text x="${x}" y="${y + 20}" text-anchor="middle" font-size="72">${escapeHtml(entity.icon || "✨")}</text><text class="world-map-label" x="${x + 60}" y="${y - 12}">${escapeHtml(entity.name)}</text></g>`;
         }).join("");
-        elements.worldMap.innerHTML = `<rect width="${state.worldWidth}" height="${state.worldHeight}" fill="#397c94"></rect><g transform="scale(100)">${terrain}${forestMarks}</g>${gridLines.join("")}${markers}`;
+        const cityMarkers = state.cities.map((city) =>
+          `<g><title>${escapeHtml(city.name)} — ${escapeHtml(city.race)} city (20 residents)</title><circle cx="${city.location.x}" cy="${city.location.y}" r="80" fill="#f3c969" stroke="#312e28" stroke-width="12"></circle><text x="${city.location.x}" y="${city.location.y + 24}" text-anchor="middle" font-size="80">${city.icon}</text><text class="world-map-label" x="${city.location.x + 90}" y="${city.location.y - 20}">${escapeHtml(city.name)}</text></g>`
+        ).join("");
+        elements.worldMap.innerHTML = `<rect width="${state.worldWidth}" height="${state.worldHeight}" fill="#397c94"></rect><g transform="scale(120)">${terrain}${forestMarks}</g>${gridLines.join("")}${cityMarkers}${markers}`;
       }
 
       function toggleEquipment(entity, item) {
@@ -3020,6 +3254,258 @@
           button.addEventListener("click", choice.action);
           elements.relationshipEventChoices.appendChild(button);
         });
+      }
+
+      function renderQuestStatus() {
+        const activeQuests = state.quests.filter((quest) =>
+          quest.status === "active" && (quest.assigneeId === currentPlayer()?.id || quest.requesterId === currentPlayer()?.id)
+        );
+        elements.questStatus.innerHTML = activeQuests.length
+          ? `<strong>Active quests</strong>${activeQuests.map((quest) =>
+            `<p>${escapeHtml(quest.description)} · ${quest.reward.toLocaleString()} coins</p>`
+          ).join("")}`
+          : "<strong>No active quests</strong>";
+      }
+
+      function showQuestDialog(pendingQuest) {
+        state.pendingQuest = pendingQuest;
+        const acceptingQuest = pendingQuest.kind === "offer";
+        elements.questTitle.textContent = acceptingQuest ? "Quest offer" : "Choose a task";
+        elements.questMessage.textContent = acceptingQuest
+          ? `${pendingQuest.requesterName} offers: ${pendingQuest.description} Proposed reward: ${pendingQuest.proposedReward} coins. You may offer between ${pendingQuest.minimumReward} and ${pendingQuest.maximumReward} coins.`
+          : `${pendingQuest.requesterName} wants to work for you. Describe the task and choose their payment (they require at least ${pendingQuest.minimumPay} coins). You have ${pendingQuest.availableMoney} coins available.`;
+        elements.questTaskLabel.hidden = acceptingQuest;
+        elements.questTask.required = !acceptingQuest;
+        elements.questTask.value = "";
+        elements.questAmountLabel.hidden = false;
+        elements.questAmount.min = String(acceptingQuest ? pendingQuest.minimumReward : pendingQuest.minimumPay);
+        elements.questAmount.max = String(acceptingQuest ? pendingQuest.maximumReward : pendingQuest.availableMoney);
+        elements.questAmount.value = String(acceptingQuest ? pendingQuest.proposedReward : pendingQuest.minimumPay);
+        elements.questPrimaryButton.textContent = acceptingQuest ? "Accept quest" : "Offer task";
+        elements.questNegotiateButton.hidden = !acceptingQuest;
+        elements.questNegotiateButton.textContent = "Negotiate";
+        elements.questDeclineButton.textContent = acceptingQuest ? "Decline" : "Cancel";
+        if (!elements.questDialog.open) elements.questDialog.showModal();
+      }
+
+      function finishPendingQuestTurn(message = "") {
+        const pending = state.pendingQuest;
+        state.pendingQuest = null;
+        elements.questDialog.close();
+        if (message) addLog(message);
+        const actor = state.entities.find((entity) => entity.id === pending?.actorId);
+        if (actor) finishActorTurn(actor);
+        else render();
+      }
+
+      function submitQuest(event) {
+        event.preventDefault();
+        const pending = state.pendingQuest;
+        if (!pending) return;
+        const amount = Math.floor(Number(elements.questAmount.value));
+        if (pending.kind === "offer") {
+          if (!Number.isFinite(amount) || amount < pending.minimumReward || amount > pending.maximumReward) {
+            finishPendingQuestTurn(`<strong>${escapeHtml(pending.requesterName)}</strong> cancels the quest because the requested reward is outside their budget.`);
+            return;
+          }
+          const quest = {
+            id: makeId(),
+            requesterId: pending.requesterId,
+            assigneeId: pending.assigneeId,
+            description: pending.description,
+            objective: pending.objective,
+            targetId: pending.targetId || "",
+            reward: amount,
+            payerId: pending.requesterId,
+            status: "active"
+          };
+          state.quests.push(quest);
+          finishPendingQuestTurn(`<strong>${escapeHtml(pending.assigneeName)}</strong> accepts ${escapeHtml(pending.description)} for ${amount} coins.`);
+          return;
+        }
+
+        const task = elements.questTask.value.trim();
+        const player = currentPlayer();
+        const reserved = state.quests.filter((quest) => quest.status === "active" && quest.payerId === player?.id)
+          .reduce((total, quest) => total + quest.reward, 0);
+        if (!task || !Number.isFinite(amount) || amount < pending.minimumPay
+          || amount + reserved > (player?.money || 0)) {
+          elements.questMessage.textContent = `${pending.requesterName} needs at least ${pending.minimumPay} coins, and your uncommitted balance is ${Math.max(0, (player?.money || 0) - reserved)} coins.`;
+          return;
+        }
+        const target = findActionTarget(task);
+        const killTask = /\b(kill|defeat|eliminate)\b/i.test(task) && target;
+        const collectTask = /\b(find|bring|collect|search)\b/i.test(task);
+        const quest = {
+          id: makeId(),
+          requesterId: player.id,
+          assigneeId: pending.requesterId,
+          description: task,
+          objective: killTask ? "kill" : collectTask ? "collect" : "custom",
+          targetId: killTask ? target.id : "",
+          progressTurns: 0,
+          reward: amount,
+          payerId: player.id,
+          status: "active"
+        };
+        state.quests.push(quest);
+        finishPendingQuestTurn(`<strong>${escapeHtml(pending.requesterName)}</strong> accepts the task “${escapeHtml(task)}” for ${amount} coins.`);
+      }
+
+      function requestQuestFromNpc(actor, target) {
+        if (!target || isAnimal(target) || !sameMapSquare(actor, target)) {
+          addLog("Ask a nearby, living, non-animal creature for a quest.");
+          render();
+          return false;
+        }
+        const possibleTargets = state.entities.filter((entity) =>
+          entity.id !== actor.id && entity.id !== target.id && entity.hp > 0
+          && entity.race === "Human" && isEntityVisibleToPlayer(entity)
+        );
+        let questDetails;
+        if (possibleTargets.length && Math.random() < 0.5) {
+          const victim = randomFrom(possibleTargets);
+          questDetails = {
+            description: `Defeat ${victim.name}, a human who has angered ${target.name}.`,
+            objective: "kill",
+            targetId: victim.id,
+            proposedReward: Math.floor(Math.random() * 151) + 150,
+            minimumReward: 100,
+            maximumReward: Math.min(800, target.money || 0)
+          };
+        } else {
+          questDetails = {
+            description: `${target.name} asks you to find a red flower.`,
+            objective: "collect",
+            targetId: "",
+            proposedReward: Math.floor(Math.random() * 101) + 50,
+            minimumReward: 25,
+            maximumReward: Math.min(500, target.money || 0)
+          };
+        }
+        if (questDetails.maximumReward < questDetails.minimumReward) {
+          addLog(`${escapeHtml(target.name)} cannot afford to offer a quest right now.`);
+          render();
+          return false;
+        }
+        actor.turnUsed = true;
+        showQuestDialog({
+          kind: "offer",
+          actorId: actor.id,
+          requesterId: target.id,
+          requesterName: target.name,
+          assigneeId: actor.id,
+          assigneeName: actor.name,
+          ...questDetails,
+          proposedReward: Math.min(questDetails.proposedReward, questDetails.maximumReward)
+        });
+        return true;
+      }
+
+      function askPlayerToAssignQuest(actor) {
+        const player = currentPlayer();
+        if (!player || actor.cityId !== cityAtLocation(player.location)?.id || !sameMapSquare(actor, player)) return false;
+        const minimumPay = Math.floor(Math.random() * 61) + 40;
+        const reserved = state.quests.filter((quest) => quest.status === "active" && quest.payerId === player.id)
+          .reduce((total, quest) => total + quest.reward, 0);
+        const availableMoney = Math.max(0, player.money - reserved);
+        if (availableMoney < minimumPay) {
+          actor.turnUsed = true;
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> asks to work for you, but your uncommitted funds are below their minimum payment of ${minimumPay} coins.`);
+          finishActorTurn(actor);
+          return true;
+        }
+        actor.turnUsed = true;
+        showQuestDialog({
+          kind: "hire",
+          actorId: actor.id,
+          requesterId: actor.id,
+          requesterName: actor.name,
+          minimumPay,
+          availableMoney
+        });
+        return true;
+      }
+
+      function finishQuest(quest) {
+        if (quest.status !== "active") return;
+        const payer = state.entities.find((entity) => entity.id === quest.payerId);
+        const recipient = state.entities.find((entity) => entity.id === quest.assigneeId);
+        if (!payer || !recipient || payer.money < quest.reward) {
+          quest.status = "cancelled";
+          addLog(`The quest “${escapeHtml(quest.description)}” is cancelled because the payment is no longer available.`);
+          return;
+        }
+        payer.money -= quest.reward;
+        recipient.money = (recipient.money || 0) + quest.reward;
+        quest.status = "completed";
+        if (recipient.isPlayer) addLog(`<strong>${escapeHtml(recipient.name)}</strong> completes the quest and earns ${quest.reward} coins.`);
+        else addLog(`<strong>${escapeHtml(recipient.name)}</strong> completes the task and earns ${quest.reward} coins.`);
+      }
+
+      function progressAssignedQuest(actor) {
+        const quest = state.quests.find((entry) =>
+          entry.status === "active" && entry.assigneeId === actor.id
+        );
+        if (!quest) return false;
+        if (quest.objective === "kill") {
+          const target = state.entities.find((entity) => entity.id === quest.targetId && entity.hp > 0);
+          if (!target) {
+            finishQuest(quest);
+            actor.turnUsed = true;
+            finishActorTurn(actor);
+            return true;
+          }
+          const weapon = findUsableWeapon(actor);
+          if (distanceInSquares(actor, target) > (weapon?.range || 0)) {
+            rollD20(actor, "agility");
+            const movement = moveToward(actor, target);
+            actor.turnUsed = true;
+            addLog(`<strong>${escapeHtml(actor.name)}</strong> ${movement} toward ${escapeHtml(target.name)} to work on the quest.`);
+          } else {
+            actor.turnUsed = true;
+            addLog(`<strong>${escapeHtml(actor.name)}</strong> attacks ${escapeHtml(target.name)} to complete the quest.`);
+            resolveAttack(actor, target);
+          }
+          finishActorTurn(actor);
+          return true;
+        }
+
+        actor.turnUsed = true;
+        quest.progressTurns = (quest.progressTurns || 0) + 1;
+        const roll = rollD20(actor, "survival");
+        if (roll >= 10 || quest.progressTurns >= 3) {
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> completes the task “${escapeHtml(quest.description)}” (d20: ${roll}).`);
+          finishQuest(quest);
+        } else {
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> works on the task “${escapeHtml(quest.description)}” but has not finished yet (d20: ${roll}).`);
+        }
+        finishActorTurn(actor);
+        return true;
+      }
+
+      function completeKillQuests(target) {
+        state.quests.filter((quest) =>
+          quest.status === "active" && quest.objective === "kill" && quest.targetId === target.id
+        ).forEach(finishQuest);
+      }
+
+      function searchForQuestItem(actor, actionText) {
+        if (!actor.isPlayer || !/\b(search|look for|find|gather)\b.*\bred flower\b/i.test(actionText)) return false;
+        const quest = state.quests.find((entry) =>
+          entry.status === "active" && entry.assigneeId === actor.id && entry.objective === "collect"
+        );
+        if (!quest) return false;
+        const roll = rollD20(actor, "survival");
+        actor.turnUsed = true;
+        if (roll >= 6) {
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> finds the red flower (d20: ${roll}).`);
+          finishQuest(quest);
+        } else {
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> searches for the red flower but finds none (d20: ${roll}).`);
+        }
+        finishActorTurn(actor);
+        return true;
       }
 
       function showNetanyahuWishOptions(candidate) {
@@ -3205,16 +3691,31 @@
         const description = String(entityInput.description || "").trim() || "A bold and unforgettable being.";
         const effects = getDescriptionEffects(description);
         const isInvulnerable = Boolean(entityInput.isInvulnerable);
-        const maxHp = isInvulnerable ? Infinity : Math.max(1, hp + traitHpModifier(traits));
+        const maxHp = isInvulnerable ? Infinity : Math.max(1, hp + (raceHasFixedHealth(entityInput.race || entityInput.type) ? 0 : traitHpModifier(traits)));
         const entity = {
           id: makeId(),
-          name: entityInput.name.trim(),
+          name: String(entityInput.name || "Unnamed").trim(),
           type: entityInput.type.trim(),
+          race: entityInput.race || entityInput.type.trim(),
           relationshipStatus: entityInput.relationshipStatus || "unspecified",
           gender: entityInput.gender || "unspecified",
           sexuality: entityInput.sexuality || "straight",
           priority: entityInput.priority || randomFrom(creaturePriorities)[0],
-          age: entityInput.age || null,
+          age: entityInput.age ?? null,
+          skinTone: entityInput.skinTone || "",
+          cityId: entityInput.cityId || "",
+          cityResident: Boolean(entityInput.cityResident),
+          money: Number.isFinite(entityInput.money) ? entityInput.money : 0,
+          isChild: Boolean(entityInput.isChild),
+          parentIds: entityInput.parentIds || [],
+          motherId: entityInput.motherId || "",
+          fatherId: entityInput.fatherId || "",
+          betrayedPartnerId: entityInput.betrayedPartnerId || "",
+          affairParentId: entityInput.affairParentId || "",
+          affairDiscovered: false,
+          isSummonedCompanion: Boolean(entityInput.isSummonedCompanion),
+          ownerId: entityInput.ownerId || "",
+          supportTargetId: "",
           location: entityInput.location || randomLocation(),
           resources: entityInput.resources || {},
           skillPoints: entityInput.skillPoints || {},
@@ -3223,7 +3724,7 @@
           humanForm: Boolean(entityInput.humanForm),
           description,
           descriptionEffects: effects,
-          icon: entityInput.icon.trim() || randomFrom(iconChoices(entityInput.type, entityInput.gender)),
+          icon: String(entityInput.icon || "").trim() || randomFrom(iconChoices(entityInput.type, entityInput.gender)),
           traits,
           traitModifiers: modifiers,
           hp: isInvulnerable ? Infinity : maxHp,
@@ -3259,7 +3760,7 @@
 
         addLog(`<strong>${escapeHtml(entity.name)}</strong> enters the story as a ${escapeHtml(entity.type)}.`, entity);
 
-        findCreatureImage(entity).then((photo) => {
+        if (!entityInput.skipImageSearch) findCreatureImage(entity).then((photo) => {
           if (!photo || !state.entities.some((being) => being.id === entity.id)) return;
           entity.image = photo.url;
           entity.imageSource = photo.source || "";
@@ -3271,23 +3772,30 @@
           });
           render();
         });
+        return entity;
       }
 
       function initializePlayer(playerDetails) {
         const traits = [...playerDetails.traits, assignPlayerCounterTrait(playerDetails.traits)];
         const description = String(playerDetails.description || "").trim() || "Player character.";
         const effects = getDescriptionEffects(description);
-        const hp = Math.max(1, 50 + traitHpModifier(traits));
+        const race = playerDetails.race;
+        const classBonusHp = playerDetails.characterClass === "fighter" ? 400 : 0;
+        const hp = startingHitPoints(playerDetails.name, race) + classBonusHp;
         const player = {
           id: makeId(),
           name: playerDetails.name,
-          type: "Player",
+          type: race,
+          race,
           description,
-          icon: playerDetails.gender === "male" ? "👨" : "👩",
+          icon: randomFrom(iconChoices(race, playerDetails.gender)),
           gender: playerDetails.gender,
           sexuality: playerDetails.sexuality,
+          characterClass: playerDetails.characterClass,
+          skinTone: race === "Human" ? randomFrom(["white", "black", "brown"]) : "",
           age: playerDetails.age,
           location: randomLocation(),
+          money: 2000,
           resources: {},
           skillPoints: {},
           knownRecipes: [],
@@ -3314,6 +3822,15 @@
         state.entities.push(player);
         registerDescriptionInteractions(player);
         state.currentIndex = 0;
+        const classDescriptions = {
+          fighter: "Fighter: deals double normal damage and triple critical damage, and starts with 400 bonus HP.",
+          summoner: "Summoner: summon up to three living companions to assist in combat.",
+          healer: "Healer: restore your own or another creature's HP; healing others raises rapport.",
+          wizard: "Wizard/Witch: class selected; spellcasting will be added later."
+        };
+        elements.playerClassSummary.textContent = classDescriptions[player.characterClass] || classDescriptions.wizard;
+        seedCitiesAndPopulations();
+        render();
       }
 
       function registerDescriptionInteractions(entity) {
@@ -3338,153 +3855,6 @@
           const score = entity.descriptionEffects.disposition > 0 ? "+10" : "-10";
           addLog(`<strong>${escapeHtml(entity.name)}</strong>'s ${dispositionText} description sets their starting relationship with each creature to ${score}.`);
         }
-      }
-
-      function createBeing(event) {
-        event.preventDefault();
-        if (state.pendingCreationType !== "creature" || !state.pendingCreationActorId) return;
-
-        const name = elements.beingName.value.trim();
-        const type = elements.beingType.value.trim();
-        const icon = elements.beingIcon.value.trim() || "✨";
-        const description = elements.beingDescription.value.trim();
-        const { traits, modifiers } = getCreatureTraits(type);
-
-        if (!name || !type) {
-          elements.beingName.focus();
-          return;
-        }
-
-        const actorId = state.pendingCreationActorId;
-        const creator = state.entities.find((entity) => entity.id === actorId);
-        const priority = creator?.isPlayer && elements.beingPriorityMode.value === "choose"
-          ? elements.beingPriority.value
-          : randomFrom(creaturePriorities)[0];
-        addEntity({
-          name,
-          type,
-          icon,
-          description,
-          priority,
-          relationshipStatus: elements.beingRelationship.value,
-          gender: elements.beingGender.value,
-          sexuality: elements.beingSexuality.value,
-          humanForm: elements.beingHumanForm.checked,
-          location: creatureSpawnLocation(creator, elements.beingSpawnLocation.value),
-          traits,
-          traitModifiers: modifiers
-        }, true);
-
-        elements.createForm.reset();
-        elements.beingType.value = "Dragon";
-        elements.beingGender.value = "unspecified";
-        elements.beingSexuality.value = "straight";
-        elements.beingHumanForm.checked = false;
-        elements.humanFormLabel.hidden = true;
-        elements.beingRelationship.value = "unspecified";
-        updateSexualityOptions(elements.beingGender, elements.beingSexuality);
-        updateCreatureIcon();
-        elements.beingDescription.value = "";
-        elements.beingSpawnLocation.value = "random";
-        elements.beingPriorityMode.value = "random";
-        elements.beingPriorityLabel.hidden = true;
-        elements.beingName.focus();
-        completeTurnCreation(actorId);
-      }
-
-      function createObject(event) {
-        event.preventDefault();
-        if (state.pendingCreationType !== "object" || !state.pendingCreationActorId) return;
-
-        const name = elements.objectName.value.trim();
-        const type = elements.objectType.value.trim();
-        if (!name || !type) {
-          elements.objectName.focus();
-          return;
-        }
-
-        const actorId = state.pendingCreationActorId;
-        const builder = state.entities.find((entity) => entity.id === actorId);
-        const recipe = findRecipe(`${name} ${type}`);
-        if (!recipe) {
-          elements.objectRecipeInfo.textContent = "No recipe found. Try a shop or house. Weapons and tools must be crafted during an action.";
-          return;
-        }
-        if (["weapon", "tool", "ammunition"].includes(recipe.category)) {
-          elements.objectRecipeInfo.textContent = `${recipe.name} must be crafted during a turn, not made from the end-of-turn creation choice.`;
-          return;
-        }
-        if (recipe.category === null && (!builder || !hasHammer(builder))) {
-          elements.objectRecipeInfo.textContent = "Building a shop or house requires a hammer in your inventory.";
-          return;
-        }
-        if (!builder || !hasResources(builder, recipe.costs)) {
-          elements.objectRecipeInfo.textContent = `${formatRecipe(recipe)} Gather the missing resources before crafting.`;
-          return;
-        }
-        if (elements.objectSize.value === "small" && /\b(food|meal|bread|fruit|berries|mushrooms?|ration|snack|meat|apple|vegetable|carrot|cheese|fish)\b/i.test(`${name} ${type}`)) {
-          addLog("Food cannot be created as an item. Spend a turn searching for food instead.");
-          render();
-          return;
-        }
-        consumeResources(builder, recipe.costs);
-        const object = {
-          id: makeId(),
-          name: recipe.name,
-          type: recipe.name,
-          icon: elements.objectIcon.value.trim() || "📦",
-          description: elements.objectDescription.value.trim(),
-          size: recipe.category ? "small" : "large",
-          category: recipe.category || elements.objectCategory.value,
-          durability: recipe.durability || null,
-          maxDurability: recipe.durability || null,
-          lastDurabilityDay: recipe.durability ? state.day : null
-        };
-        if (object.size === "large") {
-          beginConstruction(builder, recipe);
-          elements.objectForm.reset();
-          elements.objectSize.value = "small";
-          document.getElementById("objectCategoryLabel").hidden = false;
-          elements.objectCategory.value = "weapon";
-          elements.objectInInventory.checked = false;
-          elements.objectInInventory.disabled = false;
-          elements.objectIcon.value = "📦";
-          elements.objectRecipeInfo.textContent = "";
-          completeTurnCreation(actorId);
-          return;
-        }
-        if (object.size === "small") state.objects.push(object);
-        if (object.size === "small" && elements.objectInInventory.checked) {
-          if (builder) builder.inventory.push(object.id);
-        }
-        addLog(`<strong>${escapeHtml(name)}</strong> is created as an object (${escapeHtml(type)}).${builder?.inventory.includes(object.id) ? ` It is added to ${escapeHtml(builder.name)}'s inventory.` : ""}`);
-        elements.objectForm.reset();
-        elements.objectSize.value = "small";
-        document.getElementById("objectCategoryLabel").hidden = false;
-        elements.objectCategory.value = "weapon";
-        elements.objectInInventory.checked = false;
-        elements.objectInInventory.disabled = false;
-        elements.objectIcon.value = "📦";
-        elements.objectRecipeInfo.textContent = "";
-        completeTurnCreation(actorId);
-      }
-
-      function updateObjectRecipeInfo() {
-        const recipe = findRecipe(`${elements.objectName.value} ${elements.objectType.value}`);
-        elements.objectRecipeInfo.textContent = formatRecipe(recipe);
-        if (!recipe) {
-          elements.objectSize.value = "small";
-          document.getElementById("objectCategoryLabel").hidden = false;
-          elements.objectInInventory.disabled = false;
-          return;
-        }
-        const isLarge = recipe.category === null;
-        elements.objectSize.value = isLarge ? "large" : "small";
-        const actionCrafted = ["weapon", "tool", "ammunition"].includes(recipe.category);
-        document.getElementById("objectCategoryLabel").hidden = isLarge || actionCrafted;
-        elements.objectInInventory.disabled = isLarge || actionCrafted;
-        if (recipe.category === "armor" || recipe.category === "weapon") elements.objectCategory.value = recipe.category;
-        if (elements.objectInInventory.disabled) elements.objectInInventory.checked = false;
       }
 
       function createCraftedItem(entity, recipe, description = "") {
@@ -3519,7 +3889,7 @@
         return true;
       }
 
-      function resourceForage(actionText, actor, skipCreation = true) {
+      function resourceForage(actionText, actor) {
         const target = actionText.match(/\b(?:search(?:\s+for)?|look\s+for|gather|collect|mine|chop)\s+(?:some\s+)?(?:a\s+|an\s+)?(resources?|sticks?|string|strings|wood|stone chunks?|stones?|iron|metal|sand|leather)\b/i);
         const requested = target?.[1]?.toLowerCase();
         const miningStone = /\bmine\b/i.test(actionText) && requested?.startsWith("stone");
@@ -3549,7 +3919,7 @@
             found.forEach((resource) => addResource(actor, resource));
             addLog(`<strong>${escapeHtml(actor.name)}</strong> finds ${found.map((resource) => resourceNames[resource]).join(" and ")} (d20: ${roll}).`);
           }
-          finishActorTurn(actor, skipCreation);
+          finishActorTurn(actor);
           return;
         }
 
@@ -3563,7 +3933,7 @@
           const verb = requiresAxe ? "chops" : requiresPickaxe ? "mines" : "finds";
           addLog(`<strong>${escapeHtml(actor.name)}</strong> ${verb} ${formatResourceAmount(resource, 1)} (d20: ${roll}).`);
         }
-        finishActorTurn(actor, skipCreation);
+        finishActorTurn(actor);
       }
 
       function isResourceAction(actionText) {
@@ -3705,7 +4075,7 @@
         return true;
       }
 
-      function craftAction(actionText, actor, skipCreation = true) {
+      function craftAction(actionText, actor) {
         const recipe = findRecipe(actionText);
         if (!recipe) {
           addLog(`No recipe found for that item. ${formatRecipe(null)}`);
@@ -3737,7 +4107,7 @@
           else createCraftedItem(actor, recipe);
           addLog(`<strong>${escapeHtml(actor.name)}</strong> succeeds at crafting (${roll}/20).`);
         }
-        finishActorTurn(actor, skipCreation);
+        finishActorTurn(actor);
         return true;
       }
 
@@ -3853,69 +4223,12 @@
         return true;
       }
 
-      function completeTurnCreation(actorId) {
-        if (state.pendingCreationActorId !== actorId) return;
-        state.pendingCreationActorId = null;
-        state.pendingCreationType = null;
-        advanceTurn();
-        render();
-        scheduleAiTurn();
-      }
-
-      function beginTurnCreation(actor) {
-        if (actor.isPlayer) {
-          state.pendingCreationActorId = actor.id;
-          state.pendingCreationType = null;
-          elements.beingPriorityModeLabel.hidden = false;
-          elements.beingPriorityMode.value = "random";
-          elements.beingPriorityLabel.hidden = true;
-          render();
-          return;
-        }
-
-        const objectPriority = ["building", "trading", "crafting", "selling"].includes(actor.priority);
-        let createCreature = !objectPriority && Math.random() < 0.5;
-        let objectRecipe = null;
-        if (!createCreature) {
-          const recipes = itemRecipes.filter((recipe) =>
-            recipe.category === null
-            && hasHammer(actor)
-            && (actor.priority !== "trading" && actor.priority !== "selling" || recipe.name === "Shop")
-          );
-          objectRecipe = randomFrom(recipes.filter((recipe) => hasResources(actor, recipe.costs))) || null;
-          if (!objectRecipe) {
-            addLog(`<strong>${escapeHtml(actor.name)}</strong> does not have the resources for a creation and will create a creature instead.`);
-            createCreature = true;
-          }
-        }
-        if (createCreature) {
-          const types = ["Fox", "Dragon", "Bee", "Spirit", "Robot", "Human", "Goblin", "Orc", "Demon", "Angel", "Human-form God"];
-          const type = randomFrom(types);
-          const gender = randomFrom(["male", "female"]);
-          addEntity({
-            name: `New ${type}`,
-            type,
-            icon: randomFrom(iconChoices(type, gender)),
-            description: `Created by ${actor.name} at the end of their turn.`,
-            relationshipStatus: "unspecified",
-            gender,
-            sexuality: randomFrom(["straight", "bisexual", gender === "male" ? "gay" : "lesbian"]),
-            humanForm: type === "Human-form God"
-          }, true);
-        } else {
-          consumeResources(actor, objectRecipe.costs);
-          beginConstruction(actor, objectRecipe);
-        }
-
-        advanceTurn();
-        render();
-        scheduleAiTurn();
-      }
-
       function rollD20(entity = null, stat = null) {
         const rawResult = Math.floor(Math.random() * 20) + 1;
         const modifier = entity && stat ? traitModifier(entity, stat) : 0;
         const result = Math.max(1, Math.min(20, rawResult + modifier));
+        const activeEntity = state.entities[state.currentIndex];
+        if (activeEntity?.cityResident && !isEntityVisibleToPlayer(activeEntity)) return result;
         const rollCard = document.createElement("div");
         rollCard.className = "dice-result";
         const face = document.createElement("div");
@@ -4003,7 +4316,7 @@
 
       function findActionTarget(actionText) {
         const actionWords = actionText.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
-        const matches = state.entities.filter((entity) => {
+        const matches = visibleEntities().filter((entity) => {
           if (entity.isPlayer || entity.hp <= 0) return false;
           const nameWords = entity.name.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
           return nameWords.length > 0 && actionWords.some((_, start) =>
@@ -4035,19 +4348,26 @@
 
       function findTravelTarget(actionText, actor) {
         const words = actionText.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
-        return state.entities
+        const entityTarget = visibleEntities()
           .filter((entity) => entity.id !== actor.id && entity.hp > 0)
           .filter((entity) => {
             const nameWords = entity.name.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
             return nameWords.length && nameWords.every((word) => words.includes(word));
           })
           .sort((first, second) => second.name.length - first.name.length)[0] || null;
+        if (entityTarget) return entityTarget;
+        return state.cities.filter((city) => {
+          const cityWords = city.name.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
+          return cityWords.length && words.some((_, start) =>
+            cityWords.every((word, offset) => words[start + offset] === word)
+          );
+        }).sort((first, second) => second.name.length - first.name.length)[0] || null;
       }
 
       function travelToTarget(actionText, actor) {
         const target = findTravelTarget(actionText, actor);
         if (!target) {
-          addLog("To travel, type the name of another living creature on the map.");
+          addLog("To travel, type the name of another living creature or a city shown on the map.");
           render();
           return false;
         }
@@ -4129,6 +4449,7 @@
 
         if (target.hp === 0) {
           completeDemonContractsForTarget(target.id);
+          completeKillQuests(target);
           if (target.isPlayer) {
             addLog(`<strong>${escapeHtml(target.name)} has been defeated.</strong>`);
           } else {
@@ -4196,7 +4517,9 @@
             const armor = state.objects.find((item) => item.id === target.equippedArmorId);
             const protectedCritical = critical && armor?.criticalProtectionTargetId === attacker.id;
             const baseDamage = Math.max(1, Math.ceil(target.maxHp * 0.1));
-            const damage = baseDamage * (critical && !protectedCritical ? 3 : 1) * (weapon ? 2 : 1);
+            const fighterMultiplier = attacker.isPlayer && attacker.characterClass === "fighter"
+              && (!critical || protectedCritical) ? 2 : 1;
+            const damage = baseDamage * (critical && !protectedCritical ? 3 : 1) * (weapon ? 2 : 1) * fighterMultiplier;
             const actualDamage = damageAfterArmor(target, damage);
             const criticalMessage = protectedCritical
               ? `lands a critical hit on <strong>${escapeHtml(target.name)}</strong>, but their armor negates it`
@@ -4229,6 +4552,11 @@
           } else {
             addLog(`<strong>${escapeHtml(target.name)}</strong> does not recognize who attacked.`);
           }
+        }
+        if (target.isPlayer && attacker.hp > 0) {
+          state.entities.filter((entity) =>
+            entity.isSummonedCompanion && entity.ownerId === target.id && entity.hp > 0
+          ).forEach((companion) => setHostile(companion, attacker));
         }
 
         if (target.isPlayer) {
@@ -4527,6 +4855,10 @@
       }
 
       function resolveSocialAction(actor, target, actionText, intent) {
+        if (isAnimal(actor) || isAnimal(target)) {
+          addLog("Animals cannot talk, socialize, or form romantic relationships.");
+          return;
+        }
         const approachRoll = rollD20(actor, "charisma");
         const requestRoll = rollD20(actor, "charisma");
         const hasPartner = target.relationshipStatus === "partnered";
@@ -4558,12 +4890,185 @@
           const player = state.entities.find((entity) => entity.isPlayer);
           if (actor.isPlayer && target !== player && canFormPlayerRelationship(target, actor)) offerRelationship(target, actor);
           else if (target.isPlayer && actor !== player && canFormPlayerRelationship(actor, target)) offerRelationship(actor, target);
+          else if (!actor.isPlayer && !target.isPlayer
+            && isRomanceEligible(actor) && isRomanceEligible(target)
+            && isAttractedTo(actor, target) && isAttractedTo(target, actor)) {
+            establishRelationship(actor, target);
+            state.relationships[relationshipKey(actor.id, target.id)] = 100;
+            state.relationships[relationshipKey(target.id, actor.id)] = 100;
+            addLog(`<strong>${escapeHtml(actor.name)}</strong> and <strong>${escapeHtml(target.name)}</strong> become partners.`);
+          }
         }
+      }
+
+      function openSummonDialog(actor) {
+        if (actor.characterClass !== "summoner") {
+          addLog("Only a Summoner can summon companions.");
+          render();
+          return;
+        }
+        const remaining = 3 - state.entities.filter((entity) =>
+          entity.isSummonedCompanion && entity.ownerId === actor.id && entity.hp > 0
+        ).length;
+        if (remaining <= 0) {
+          addLog("You already have three living summoned companions.");
+          render();
+          return;
+        }
+        state.pendingSummonerId = actor.id;
+        elements.summonLimitMessage.textContent = `Choose one to ${remaining} companion${remaining === 1 ? "" : "s"}. You can have at most three living companions.`;
+        elements.summonSlots.innerHTML = Array.from({ length: remaining }, (_, index) => `
+          <label class="summon-slot">
+            Companion ${index + 1} name
+            <input name="companionName" type="text" maxlength="40" placeholder="Companion name" />
+            Type or race
+            <input name="companionType" type="text" maxlength="40" placeholder="Human, wolf, goblin..." />
+            Gender
+            <select name="companionGender">
+              <option value="random">Random</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+            </select>
+          </label>
+        `).join("");
+        if (!elements.summonDialog.open) elements.summonDialog.showModal();
+        render();
+      }
+
+      function submitSummons(event) {
+        event.preventDefault();
+        const actor = state.entities.find((entity) => entity.id === state.pendingSummonerId);
+        if (!actor || !actor.isPlayer || actor.characterClass !== "summoner" || actor.turnUsed) {
+          elements.summonDialog.close();
+          state.pendingSummonerId = null;
+          return;
+        }
+        const names = Array.from(elements.summonSlots.querySelectorAll('input[name="companionName"]'));
+        const types = Array.from(elements.summonSlots.querySelectorAll('input[name="companionType"]'));
+        const genders = Array.from(elements.summonSlots.querySelectorAll('select[name="companionGender"]'));
+        const selections = names.map((input, index) => ({
+          name: input.value.trim(),
+          type: types[index].value.trim(),
+          gender: genders[index].value === "random" ? randomFrom(["male", "female"]) : genders[index].value
+        })).filter((selection) => selection.name || selection.type);
+        const livingCompanions = state.entities.filter((entity) =>
+          entity.isSummonedCompanion && entity.ownerId === actor.id && entity.hp > 0
+        ).length;
+        if (!selections.length || selections.length > 3 - livingCompanions
+          || selections.some((selection) => !selection.name || !selection.type)) {
+          addLog("Enter both a name and a type for one or more companions, without exceeding your three-companion limit.");
+          return;
+        }
+        selections.forEach(({ name, type, gender }) => addEntity({
+          name,
+          type,
+          gender,
+          sexuality: "straight",
+          age: 18,
+          icon: randomFrom(iconChoices(type, gender)),
+          description: `A summoned companion who protects ${actor.name}.`,
+          location: { ...actor.location },
+          isSummonedCompanion: true,
+          ownerId: actor.id
+        }, true));
+        actor.turnUsed = true;
+        state.pendingSummonerId = null;
+        elements.summonDialog.close();
+        addLog(`<strong>${escapeHtml(actor.name)}</strong> summons ${selections.length} companion${selections.length === 1 ? "" : "s"}.`);
+        finishActorTurn(actor);
+      }
+
+      function healAction(actor, target) {
+        if (actor.characterClass !== "healer") {
+          addLog("Only a Healer can use healing actions.");
+          render();
+          return true;
+        }
+        target ||= actor;
+        if (!target || target.hp <= 0) {
+          addLog("Choose a living creature to heal.");
+          render();
+          return true;
+        }
+        if (target !== actor && !sameMapSquare(actor, target)) {
+          addLog(`You must be in the same 500-meter map square as ${escapeHtml(target.name)} to heal them.`);
+          render();
+          return true;
+        }
+        const roll = rollD20(actor, "wisdom");
+        const restored = Number.isFinite(target.maxHp) ? Math.min(target.maxHp - target.hp, 5 + roll) : 0;
+        target.hp += restored;
+        if (target !== actor) {
+          changeRapport(target.id, actor.id, 10);
+          changeRapport(actor.id, target.id, 10);
+        }
+        actor.turnUsed = true;
+        addLog(`<strong>${escapeHtml(actor.name)}</strong> heals ${target === actor ? "themself" : `<strong>${escapeHtml(target.name)}</strong>`} for ${restored} HP (${target.hp}/${target.maxHp}; roll ${roll}/20).${target !== actor ? " Rapport +10." : ""}`);
+        finishActorTurn(actor);
+        return true;
+      }
+
+      function spendNightTogether(actor, target) {
+        if (!target || target.hp <= 0 || !isRomanceEligible(actor) || !isRomanceEligible(target)
+          || !isOppositeGenderPair(actor, target)) {
+          addLog("A private night together requires two living, romance-eligible characters of different genders.");
+          render();
+          return true;
+        }
+        if (getRapport(actor.id, target.id) < 30 || getRapport(target.id, actor.id) < 30) {
+          addLog("You both need at least 30 rapport to spend the night together.");
+          render();
+          return true;
+        }
+        if (!sameMapSquare(actor, target)) {
+          addLog(`You must be in the same 500-meter map square as ${escapeHtml(target.name)}.`);
+          render();
+          return true;
+        }
+        const birthRoll = rollD20(actor, null);
+        let child = null;
+        if (birthRoll >= 11) child = createChild(actor, target);
+        const enjoyment = getRapport(target.id, actor.id) >= 70
+          ? `${target.name} really enjoyed the time together.`
+          : `${target.name} enjoyed the time together.`;
+        actor.turnUsed = true;
+        state.deferredTurnActorId = actor.id;
+        state.relationshipEvent = {
+          title: "A private night together",
+          message: `You and ${target.name} spent the night together off-screen. ${enjoyment} ${child ? `You welcomed ${child.name} (d20: ${birthRoll}).` : `No child was born this time (d20: ${birthRoll}).`}`,
+          choices: [{ label: "Continue", action: finishRelationshipEvent }]
+        };
+        render();
+        return true;
+      }
+
+      function revealAffairByTelling(actionText, target, actor) {
+        if (!target || !/\b(tell|inform|explain)\b/i.test(actionText)) return false;
+        const child = state.entities.find((entity) =>
+          entity.betrayedPartnerId === target.id && entity.affairParentId && !entity.affairDiscovered
+        );
+        if (!child) return false;
+        const partner = state.entities.find((entity) => entity.id === target.partnerId);
+        if (!partner) return false;
+        child.affairDiscovered = true;
+        if (target.isPlayer) {
+          startPlayerInfidelityConfrontation(target, partner, child);
+          state.deferredTurnActorId = actor.id;
+        } else {
+          const confessionRoll = rollD20(partner, "charisma");
+          if (confessionRoll >= 11) {
+            endRelationship(target, partner);
+            addLog(`<strong>${escapeHtml(target.name)}</strong> confronts ${escapeHtml(partner.name)}. They confess (d20: ${confessionRoll}), and the couple breaks up.`);
+          } else {
+            changeRapport(target.id, partner.id, -10);
+            addLog(`<strong>${escapeHtml(target.name)}</strong> confronts ${escapeHtml(partner.name)}. They deny the affair (d20: ${confessionRoll}), leaving ${escapeHtml(target.name)} suspicious.`);
+          }
+        }
+        return true;
       }
 
       function resolveActionCore(event) {
         event.preventDefault();
-        if (state.pendingCreationActorId) return;
 
         if (!state.entities.length) {
           addLog("The story is empty. Create a being before taking an action.");
@@ -4592,6 +5097,48 @@
         const actionText = elements.actionText.value.trim() || "takes a bold action";
         const target = findActionTarget(actionText);
         const intent = socialIntent(actionText);
+
+        if (/\bquest\b/i.test(actionText)) {
+          if (!target) {
+            addLog("Ask a nearby, visible creature by name for a quest.");
+            render();
+            return;
+          }
+          if (requestQuestFromNpc(actor, target)) {
+            elements.actionText.value = "";
+            render();
+          }
+          return;
+        }
+
+        if (/\b(summon|call forth)\s+(?:a\s+)?companions?\b/i.test(actionText)) {
+          openSummonDialog(actor);
+          return;
+        }
+
+        if (/\bheal(?:ing)?\b/i.test(actionText)) {
+          healAction(actor, target);
+          elements.actionText.value = "";
+          return;
+        }
+
+        if (/\b(spend|pass|share)\b.*\bnight\b|\bsleep\s+(?:with|together)\b|\btry\s+for\s+(?:a\s+)?child\b/i.test(actionText)) {
+          spendNightTogether(actor, target);
+          elements.actionText.value = "";
+          return;
+        }
+
+        if (searchForQuestItem(actor, actionText)) {
+          elements.actionText.value = "";
+          return;
+        }
+
+        if (revealAffairByTelling(actionText, target, actor)) {
+          actor.turnUsed = true;
+          elements.actionText.value = "";
+          finishActorTurn(actor);
+          return;
+        }
 
         if (/\bsummon\s+(?:benjamin\s+)?netanyahu\b/i.test(actionText)) {
           if (state.entities.some((entity) => entity.isNetanyahu)) {
@@ -4870,6 +5417,11 @@
             render();
             return;
           }
+          state.entities.filter((entity) =>
+            entity.isSummonedCompanion && entity.ownerId === actor.id && entity.hp > 0
+          ).forEach((companion) => {
+            companion.supportTargetId = target.id;
+          });
           actor.turnUsed = true;
           elements.actionText.value = "";
           finishActorTurn(actor);
@@ -4877,6 +5429,13 @@
         }
 
         if (intent && target) {
+          if (isAnimal(target)) {
+            actor.turnUsed = true;
+            addLog("Animals cannot talk, socialize, or form romantic relationships.");
+            elements.actionText.value = "";
+            finishActorTurn(actor);
+            return;
+          }
           if (!sameMapSquare(actor, target)) {
             addLog(`You must be in the same 500-meter map square as ${escapeHtml(target.name)} to interact with them.`);
             render();
@@ -4913,10 +5472,6 @@
       }
 
       function resolveAction(event) {
-        if (state.pendingCreationActorId) {
-          resolveActionCore(event);
-          return;
-        }
         const actor = state.entities[state.currentIndex];
         const actorIndex = state.currentIndex;
         const startingDay = state.day;
@@ -4928,10 +5483,10 @@
         if (diceRollNumber === startingRollNumber) {
           rollD20(actor, actionStat(actionText));
         }
-        if (state.pendingCreationActorId) return;
         if (!state.pickpocket
           && !state.relationshipEvent
           && !state.demonBargain
+          && !state.pendingSummonerId
           && !actor.turnUsed
           && state.currentIndex === actorIndex
           && state.day === startingDay) {
@@ -4941,7 +5496,7 @@
         }
       }
 
-      function finishActorTurn(actor, skipCreation = false) {
+      function finishActorTurn(actor) {
         if (actor.isPlayer) {
           for (const election of [state.netanyahuElection, state.gadiElection]) {
             if (election?.status !== "campaigning") continue;
@@ -4978,13 +5533,9 @@
           scheduleAiTurn();
           return;
         }
-        if (skipCreation) {
-          advanceTurn();
-          render();
-          scheduleAiTurn();
-          return;
-        }
-        beginTurnCreation(actor);
+        advanceTurn();
+        render();
+        scheduleAiTurn();
       }
 
       function removeEntity(entityId, reason, logRemoval = true, refresh = true) {
@@ -5004,18 +5555,44 @@
 
       function scheduleAiTurn() {
         if (aiTurnTimer) clearTimeout(aiTurnTimer);
-        if (state.pickpocket || state.relationshipEvent || state.demonBargain) return;
+        if (state.pickpocket || state.relationshipEvent || state.demonBargain || state.pendingSummonerId || state.pendingQuest) return;
         if (state.entities.some((entity) => entity.isPlayer && entity.hp <= 0)) return;
         const activeEntity = state.entities[state.currentIndex];
         if (activeEntity && !activeEntity.isPlayer && !activeEntity.turnUsed) {
-          aiTurnTimer = setTimeout(playAiTurn, 700);
+          const delay = activeEntity.cityResident && !isEntityVisibleToPlayer(activeEntity) ? 0 : 700;
+          aiTurnTimer = setTimeout(playAiTurn, delay);
         }
       }
 
       function playAiTurn() {
         aiTurnTimer = null;
         const actor = state.entities[state.currentIndex];
+        const player = currentPlayer();
         if (!actor || actor.isPlayer || actor.turnUsed) return;
+
+        if (progressAssignedQuest(actor)) return;
+
+        if (actor.isSummonedCompanion && actor.ownerId) {
+          const supportTarget = state.entities.find((entity) => entity.id === actor.supportTargetId && entity.hp > 0);
+          if (supportTarget) {
+            const weapon = findUsableWeapon(actor);
+            const attackRange = weapon?.range || 0;
+            if (distanceInSquares(actor, supportTarget) > attackRange) {
+              rollD20(actor, "agility");
+              const movement = moveToward(actor, supportTarget);
+              actor.turnUsed = true;
+              addLog(`<strong>${escapeHtml(actor.name)}</strong> ${movement} toward ${escapeHtml(supportTarget.name)} to help their summoner.`);
+              finishActorTurn(actor, true);
+              return;
+            }
+            actor.turnUsed = true;
+            addLog(`<strong>${escapeHtml(actor.name)}</strong> joins the fight against <strong>${escapeHtml(supportTarget.name)}</strong>.`);
+            resolveAttack(actor, supportTarget);
+            actor.supportTargetId = "";
+            finishActorTurn(actor, true);
+            return;
+          }
+        }
 
         const failedNetanyahuCampaign = actor.isNetanyahu
           && state.netanyahuElection?.candidateId === actor.id
@@ -5033,7 +5610,7 @@
               const movement = moveToward(actor, campaignTarget);
               actor.turnUsed = true;
               addLog(`<strong>${escapeHtml(actor.name)}</strong> ${movement} toward ${escapeHtml(campaignTarget.name)} to attack.`);
-              beginTurnCreation(actor);
+              finishActorTurn(actor, true);
               return;
             }
             actor.turnUsed = true;
@@ -5044,7 +5621,6 @@
           }
         }
 
-        const player = state.entities.find((entity) => entity.isPlayer && entity.hp > 0);
         const unpaidContract = state.demonContracts.find((contract) =>
           contract.status === "targeted"
           && contract.requesterId === player?.id
@@ -5069,7 +5645,7 @@
             const movement = moveToward(actor, hatedTarget);
             actor.turnUsed = true;
             addLog(`<strong>${escapeHtml(actor.name)}</strong> ${movement} toward ${escapeHtml(hatedTarget.name)} to attack.`);
-            beginTurnCreation(actor);
+            finishActorTurn(actor, true);
             return;
           }
           actor.turnUsed = true;
@@ -5086,7 +5662,16 @@
           moveAwayFrom(actor, suspiciousTarget);
           actor.turnUsed = true;
           addLog(`<strong>${escapeHtml(actor.name)}</strong> moves away from ${escapeHtml(suspiciousTarget.name)} and stays on guard.`);
-          beginTurnCreation(actor);
+          finishActorTurn(actor, true);
+          return;
+        }
+
+        if (actor.cityResident && player && state.playerQuestRequestDay !== state.day
+          && actor.cityId === cityAtLocation(player.location)?.id && sameMapSquare(actor, player)
+          && Math.random() < 0.02) {
+          state.playerQuestRequestDay = state.day;
+          askPlayerToAssignQuest(actor);
+          render();
           return;
         }
 
@@ -5100,7 +5685,7 @@
               const movement = moveToward(actor, target);
               actor.turnUsed = true;
               addLog(`<strong>${escapeHtml(actor.name)}</strong> ${movement} closer to ${escapeHtml(target.name)} to attack.`);
-              beginTurnCreation(actor);
+              finishActorTurn(actor, true);
               return;
             }
             actor.turnUsed = true;
@@ -5136,17 +5721,22 @@
           return;
         }
 
-        const socialTarget = randomFrom(state.entities.filter((entity) => entity.id !== actor.id && entity.hp > 0));
+        const socialTarget = randomFrom(state.entities.filter((entity) =>
+          entity.id !== actor.id && entity.hp > 0 && !isAnimal(entity)
+          && (!actor.cityResident
+            || (!entity.isPlayer && entity.cityId === actor.cityId)
+            || (entity.isPlayer && cityAtLocation(entity.location)?.id === actor.cityId))
+        ));
         const socialPriorities = ["friendship", "charming", "manipulating"];
-        const shouldSeekSocial = socialPriorities.includes(actor.priority)
-          || (!actor.priority && Math.random() < 0.35);
+        const shouldSeekSocial = !isAnimal(actor) && (socialPriorities.includes(actor.priority)
+          || (!actor.priority && Math.random() < 0.35));
         if (socialTarget && shouldSeekSocial) {
           if (!sameMapSquare(actor, socialTarget)) {
             rollD20(actor, "agility");
             const movement = moveToward(actor, socialTarget);
             actor.turnUsed = true;
             addLog(`<strong>${escapeHtml(actor.name)}</strong> ${movement} toward ${escapeHtml(socialTarget.name)} to talk.`);
-            beginTurnCreation(actor);
+            finishActorTurn(actor, true);
             return;
           }
           actor.turnUsed = true;
@@ -5177,7 +5767,7 @@
                     }
                     state.deferredTurnActorId = null;
                     render();
-                    beginTurnCreation(actor);
+                    finishActorTurn(actor, true);
                   }
                 },
                 {
@@ -5226,11 +5816,11 @@
 
         actor.turnUsed = true;
         addLog(`<strong>${escapeHtml(actor.name)}</strong> takes an AI turn and ${escapeHtml(action)}. ${outcome}`, actor);
-        beginTurnCreation(actor);
+        finishActorTurn(actor, true);
       }
 
       function resetRound() {
-        if (state.pendingCreationActorId || state.entities.some((entity) => entity.busyTurns > 0) || state.entities.some((entity) => entity.isPlayer && entity.hp <= 0)) return;
+        if (state.entities.some((entity) => entity.busyTurns > 0) || state.entities.some((entity) => entity.isPlayer && entity.hp <= 0)) return;
 
         state.round += 1;
         state.day += 1;
@@ -5263,8 +5853,10 @@
           initializePlayer({
             name,
             gender: elements.playerGender.value,
+            race: elements.playerRace.value,
             age,
             sexuality: elements.playerSexuality.value,
+            characterClass: elements.playerClass.value,
             traits: selectedPlayerTraits(),
             description: elements.playerDescription.value.trim()
           });
@@ -5272,10 +5864,10 @@
           render();
           scheduleAiTurn();
         });
-        elements.createForm.addEventListener("submit", createBeing);
-        elements.objectForm.addEventListener("submit", createObject);
         elements.actionForm.addEventListener("submit", resolveAction);
+        elements.questForm.addEventListener("submit", submitQuest);
         elements.demonBargainForm.addEventListener("submit", submitDemonBargain);
+        elements.summonForm.addEventListener("submit", submitSummons);
         elements.pickpocketRoll.addEventListener("click", choosePickpocketRoll);
         elements.pickpocketMiniGame.addEventListener("click", startPickpocketMiniGame);
         elements.startPickpocketGame.addEventListener("click", stopPickpocketMiniGame);
@@ -5285,58 +5877,9 @@
             stopPickpocketMiniGame();
           }
         });
-        elements.chooseCreature.addEventListener("click", () => {
-          if (!state.pendingCreationActorId) return;
-          state.pendingCreationType = "creature";
-          render();
-        });
-        elements.chooseObject.addEventListener("click", () => {
-          if (!state.pendingCreationActorId) return;
-          state.pendingCreationType = "object";
-          render();
-        });
-        elements.skipCreation.addEventListener("click", () => {
-          const actorId = state.pendingCreationActorId;
-          if (!actorId) return;
-          addLog("The player skips end-of-turn creation.");
-          completeTurnCreation(actorId);
-        });
-        elements.beingPriorityMode.addEventListener("change", () => {
-          elements.beingPriorityLabel.hidden = elements.beingPriorityMode.value !== "choose";
-        });
-        elements.randomIconBtn.addEventListener("click", updateCreatureIcon);
-        elements.beingType.addEventListener("input", updateCreatureIcon);
-        elements.beingGender.addEventListener("change", () => {
-          updateCreatureIcon();
-          updateSexualityOptions(elements.beingGender, elements.beingSexuality);
-        });
         elements.playerGender.addEventListener("change", () => {
           updateSexualityOptions(elements.playerGender, elements.playerSexuality);
         });
-        elements.beingType.addEventListener("input", () => {
-          elements.humanFormLabel.hidden = !/\b(gods?|goddesses|deities)\b/i.test(elements.beingType.value);
-        });
-        elements.objectSize.addEventListener("change", () => {
-          elements.objectInInventory.disabled = elements.objectSize.value !== "small";
-          document.getElementById("objectCategoryLabel").hidden = elements.objectSize.value !== "small";
-          if (elements.objectInInventory.disabled) elements.objectInInventory.checked = false;
-        });
-        const suggestObjectSize = () => {
-          const objectDetails = `${elements.objectName.value} ${elements.objectType.value}`;
-          const isLargeConstruction = /\b(shop|house|building|castle|tower|fortress|mansion|temple|bridge|warehouse|barn|stable|ship|airship)\b/i
-            .test(objectDetails);
-          elements.objectSize.value = isLargeConstruction ? "large" : "small";
-          if (/\b(armor|armour|shield|helmet|breastplate)\b/i.test(objectDetails)) {
-            elements.objectCategory.value = "armor";
-          }
-          document.getElementById("objectCategoryLabel").hidden = isLargeConstruction;
-          elements.objectInInventory.disabled = isLargeConstruction;
-          if (isLargeConstruction) elements.objectInInventory.checked = false;
-        };
-        elements.objectName.addEventListener("input", suggestObjectSize);
-        elements.objectType.addEventListener("input", suggestObjectSize);
-        elements.objectName.addEventListener("input", updateObjectRecipeInfo);
-        elements.objectType.addEventListener("input", updateObjectRecipeInfo);
         elements.openInventory.addEventListener("click", () => {
           renderInventory();
           if (!elements.inventoryDialog.open) elements.inventoryDialog.showModal();
@@ -5348,13 +5891,22 @@
         document.querySelectorAll("[data-close-dialog]").forEach((button) => {
           button.addEventListener("click", () => document.getElementById(button.dataset.closeDialog).close());
         });
-        [elements.playerSetupDialog, elements.pickpocketDialog, elements.relationshipDialog, elements.demonBargainDialog].forEach((dialog) => {
+        [elements.playerSetupDialog, elements.pickpocketDialog, elements.relationshipDialog, elements.demonBargainDialog, elements.summonDialog, elements.questDialog].forEach((dialog) => {
           dialog.addEventListener("cancel", (event) => event.preventDefault());
         });
-        [elements.pickpocketDialog, elements.relationshipDialog, elements.demonBargainDialog].forEach((dialog) => {
+        [elements.pickpocketDialog, elements.relationshipDialog, elements.demonBargainDialog, elements.summonDialog, elements.questDialog].forEach((dialog) => {
           dialog.addEventListener("click", (event) => {
             if (event.target === dialog) event.preventDefault();
           });
+        });
+        elements.questNegotiateButton.addEventListener("click", () => {
+          if (!state.pendingQuest) return;
+          elements.questMessage.textContent = `Enter your counter-offer. ${state.pendingQuest.requesterName} will cancel if it is outside their budget.`;
+          elements.questAmount.focus();
+        });
+        elements.questDeclineButton.addEventListener("click", () => {
+          if (!state.pendingQuest) return;
+          finishPendingQuestTurn(`${escapeHtml(state.pendingQuest.requesterName)} receives no agreement and moves on.`);
         });
         elements.newRoundBtn.addEventListener("click", resetRound);
         elements.clearLogBtn.addEventListener("click", () => {
@@ -5365,7 +5917,6 @@
 
       function initialize() {
         setupEvents();
-        updateSexualityOptions(elements.beingGender, elements.beingSexuality);
         updateSexualityOptions(elements.playerGender, elements.playerSexuality);
         renderTraitGuides();
         renderPlayerTraitOptions();
