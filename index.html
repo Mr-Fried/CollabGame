@@ -886,7 +886,6 @@
         <div class="topbar-actions">
           <button type="button" id="mapBtn" class="ghost settings-button" aria-label="Map" title="Map">🗺️</button>
           <button type="button" id="settingsBtn" class="ghost settings-button" aria-label="Settings" title="Settings">⚙</button>
-          <button id="newRoundBtn" class="secondary">Sleep</button>
         </div>
       </header>
 
@@ -916,7 +915,7 @@
                 What do they do? Type a creature's name to talk to or attack it.
                 <input id="actionText" type="text" placeholder="Explore the ruins, or summon Netanyahu..." required />
               </label>
-              <p>Actions spend stamina; when everyone is exhausted, a new day begins. Sleep at 10 stamina or less to advance the day. Most actions require a d20 roll; walking, running, and sprinting do not. Visit a city shop to buy or sell.</p>
+              <p>Actions spend stamina; when everyone is exhausted, a new day begins. Type “sleep” at 10 stamina or less to advance the day. Enter a city by typing “enter [city name]” from within 1 km. Most actions require a d20 roll; walking, running, and sprinting do not.</p>
 
               <div id="diceTray" class="dice-tray" aria-live="polite">
                 <p class="dice-result-status">Ready to roll</p>
@@ -986,6 +985,24 @@
                   <button type="button" class="secondary" id="shopSellSubmitButton">Sell item</button>
                   <div id="shopSellInventory" class="shop-stock"></div>
                   <button type="button" class="ghost" id="shopSellBackButton">Back</button>
+                </section>
+              </section>
+            </dialog>
+            <dialog id="combatDialog" class="modal-dialog">
+              <section class="dialog-content">
+                <h2 id="combatTitle">Attack</h2>
+                <p id="combatMessage"></p>
+                <div id="combatChoices" class="creation-choices">
+                  <button type="button" class="secondary" id="combatRollButton">Roll a d20</button>
+                  <button type="button" class="secondary" id="combatClickButton">Click attack</button>
+                </div>
+                <section id="combatClickView" hidden>
+                  <p>Each click adds 1 damage. Nearby companions each add 1 damage too.</p>
+                  <p id="combatClickCount">Clicks: 0</p>
+                  <div class="creation-choices">
+                    <button type="button" class="primary" id="combatAttackClickButton">Attack</button>
+                    <button type="button" class="secondary" id="combatClickFinishButton">Finish attack</button>
+                  </div>
                 </section>
               </section>
             </dialog>
@@ -1146,6 +1163,7 @@
         cities: [],
         cityPopulationSeeded: false,
         pendingShop: null,
+        pendingCombat: null,
         quests: [],
         pendingQuest: null,
         turnCounter: 0,
@@ -1174,8 +1192,17 @@
         turnOrder: document.getElementById("turnOrder"),
         roundBadge: document.getElementById("roundBadge"),
         logList: document.getElementById("logList"),
-        newRoundBtn: document.getElementById("newRoundBtn"),
         clearLogBtn: document.getElementById("clearLogBtn"),
+        combatDialog: document.getElementById("combatDialog"),
+        combatTitle: document.getElementById("combatTitle"),
+        combatMessage: document.getElementById("combatMessage"),
+        combatChoices: document.getElementById("combatChoices"),
+        combatRollButton: document.getElementById("combatRollButton"),
+        combatClickButton: document.getElementById("combatClickButton"),
+        combatClickView: document.getElementById("combatClickView"),
+        combatClickCount: document.getElementById("combatClickCount"),
+        combatAttackClickButton: document.getElementById("combatAttackClickButton"),
+        combatClickFinishButton: document.getElementById("combatClickFinishButton"),
         turnPrompt: document.getElementById("turnPrompt"),
         pickpocketPanel: document.getElementById("pickpocketPanel"),
         pickpocketPrompt: document.getElementById("pickpocketPrompt"),
@@ -1567,6 +1594,18 @@
         return state.cities.find((city) => distanceBetween({ location }, { location: city.location }) <= CITY_RADIUS_KM) || null;
       }
 
+      function findCityNamedInAction(actionText) {
+        const requestedName = actionText.match(/^\s*enter\s+(?:the\s+)?(.+?)\s*$/i)?.[1]?.trim().toLowerCase();
+        return requestedName ? state.cities.find((city) => city.name.toLowerCase() === requestedName) || null : null;
+      }
+
+      function updateEnteredCity(entity) {
+        if (entity.cityId) {
+          const city = state.cities.find((entry) => entry.id === entity.cityId);
+          if (!city || distanceBetween(entity, city) > 1) entity.cityId = "";
+        }
+      }
+
       function actionStaminaCost(actionText, actor) {
         const text = actionText.toLowerCase();
         if (/\bsleep\b/.test(text) && !/\bsleep\s+(?:with|together)\b/.test(text) && actor.stamina <= 10) return 0;
@@ -1596,8 +1635,7 @@
       function isEntityVisibleToPlayer(entity) {
         if (!entity.cityId || entity.isPlayer) return true;
         const player = currentPlayer();
-        if (cityAtLocation(entity.location)?.id !== entity.cityId) return true;
-        return Boolean(player && cityAtLocation(player.location)?.id === entity.cityId);
+        return Boolean(player && player.cityId === entity.cityId);
       }
 
       function visibleEntities() {
@@ -2694,7 +2732,7 @@
           state.currentIndex = 0;
           return;
         }
-        if (state.pickpocket || state.relationshipEvent || state.demonBargain || state.pendingSummonerId || state.pendingQuest || state.pendingShop) return;
+        if (state.pickpocket || state.relationshipEvent || state.demonBargain || state.pendingSummonerId || state.pendingQuest || state.pendingShop || state.pendingCombat) return;
 
         if (state.currentIndex >= state.entities.length) {
           state.currentIndex = 0;
@@ -3184,7 +3222,7 @@
         });
 
         const activeEntity = state.entities[state.currentIndex];
-        const playerTurn = Boolean(activeEntity && activeEntity.isPlayer && activeEntity.hp > 0 && activeEntity.stamina > 0 && !activeEntity.turnUsed && !state.pickpocket && !state.relationshipEvent && !state.pendingSummonerId && !state.pendingQuest && !state.pendingShop);
+        const playerTurn = Boolean(activeEntity && activeEntity.isPlayer && activeEntity.hp > 0 && activeEntity.stamina > 0 && !activeEntity.turnUsed && !state.pickpocket && !state.relationshipEvent && !state.pendingSummonerId && !state.pendingQuest && !state.pendingShop && !state.pendingCombat);
         elements.turnPrompt.textContent = activeEntity && activeEntity.isPlayer && activeEntity.hp <= 0
             ? "You have been defeated."
           : playerTurn ? "Your turn" : activeEntity && !isEntityVisibleToPlayer(activeEntity)
@@ -3194,14 +3232,12 @@
         Array.from(elements.actionForm.elements).forEach((control) => {
           control.disabled = !playerTurn;
         });
-        elements.newRoundBtn.textContent = "Sleep";
-        elements.newRoundBtn.disabled = Boolean(!activeEntity?.isPlayer || activeEntity.stamina > 10 || state.pickpocket || state.relationshipEvent || elements.summonDialog.open || elements.questDialog.open || elements.shopDialog.open || state.entities.some((entity) => entity.busyTurns > 0) || (activeEntity && activeEntity.isPlayer && activeEntity.hp <= 0));
         renderPickpocketPanel();
         renderRelationshipEvent();
         renderQuestStatus();
         const player = currentPlayer();
         elements.playerMoney.textContent = `Money: ${(player?.money || 0).toLocaleString()} coins`;
-        const city = player && cityAtLocation(player.location);
+        const city = player?.cityId ? state.cities.find((entry) => entry.id === player.cityId) : null;
         elements.currentCity.textContent = city ? `In ${city.name}` : "Outside a city";
       }
 
@@ -3723,7 +3759,7 @@
 
       function askPlayerToAssignQuest(actor) {
         const player = currentPlayer();
-        if (!player || actor.cityId !== cityAtLocation(player.location)?.id || !sameMapSquare(actor, player)) return false;
+        if (!player || actor.cityId !== player.cityId || !sameMapSquare(actor, player)) return false;
         const minimumPay = Math.floor(Math.random() * 61) + 40;
         const reserved = state.quests.filter((quest) => quest.status === "active" && quest.payerId === player.id)
           .reduce((total, quest) => total + quest.reward, 0);
@@ -4707,6 +4743,9 @@
         const distance = distanceBetween(actor, target);
         const pace = mode === "walking" ? 1 : mode === "running" ? 3 : Math.floor(Math.random() * 6) + 5;
         const verbs = { walking: "walks", running: "runs", sprinting: "sprints" };
+        const companions = actor.isPlayer ? state.entities.filter((entity) =>
+          entity.isSummonedCompanion && entity.ownerId === actor.id && entity.hp > 0
+        ) : [];
         actor.turnUsed = true;
         const traveled = Math.min(distance, pace);
         if (distance > 0) {
@@ -4714,7 +4753,18 @@
           actor.location.x += (target.location.x - actor.location.x) * ratio;
           actor.location.y += (target.location.y - actor.location.y) * ratio;
         }
+        updateEnteredCity(actor);
+        companions.forEach((companion) => {
+          companion.location = { ...actor.location };
+          companion.cityId = actor.cityId;
+          companion.stamina = Math.max(0, companion.stamina - actionStaminaCost(actionText, companion));
+          companion.pendingStaminaCost = null;
+          companion.turnUsed = true;
+        });
         addLog(`<strong>${escapeHtml(actor.name)}</strong> ${verbs[mode]} ${traveled.toFixed(1)} km toward ${escapeHtml(target.name)}.`);
+        if (companions.length) {
+          addLog(`${companions.map((companion) => `<strong>${escapeHtml(companion.name)}</strong>`).join(", ")} follow${companions.length === 1 ? "s" : ""} alongside ${escapeHtml(actor.name)}.`);
+        }
         finishActorTurn(actor, true);
         return true;
       }
@@ -4781,6 +4831,75 @@
         return actualDamage;
       }
 
+      function nearbyCompanions(actor) {
+        return state.entities.filter((entity) =>
+          entity.isSummonedCompanion && entity.ownerId === actor.id && entity.hp > 0
+          && sameMapSquare(actor, entity)
+        );
+      }
+
+      function openCombatDialog(actor, target, attackOptions = {}) {
+        const companions = nearbyCompanions(actor);
+        state.pendingCombat = {
+          actorId: actor.id,
+          targetId: target.id,
+          weaponId: attackOptions.weapon?.id || "",
+          thrown: Boolean(attackOptions.thrown),
+          clicks: 0
+        };
+        elements.combatTitle.textContent = `Attack ${target.name}`;
+        elements.combatMessage.textContent = companions.length
+          ? `${companions.length} nearby companion${companions.length === 1 ? " is" : "s are"} ready to assist (+${companions.length} damage). Choose dice or click combat.`
+          : "Choose dice combat or click combat.";
+        elements.combatChoices.hidden = false;
+        elements.combatClickView.hidden = true;
+        elements.combatClickCount.textContent = "Clicks: 0";
+        if (!elements.combatDialog.open) elements.combatDialog.showModal();
+      }
+
+      function finishPlayerAttack(clickMode = false) {
+        const pending = state.pendingCombat;
+        if (!pending) return;
+        const actor = state.entities.find((entity) => entity.id === pending.actorId);
+        const target = state.entities.find((entity) => entity.id === pending.targetId && entity.hp > 0);
+        state.pendingCombat = null;
+        elements.combatDialog.close();
+        if (!actor || !target) {
+          render();
+          scheduleAiTurn();
+          return;
+        }
+        const weapon = pending.weaponId ? state.objects.find((item) => item.id === pending.weaponId) : null;
+        const companions = nearbyCompanions(actor);
+        const bonusDamage = companions.length + (clickMode ? pending.clicks : 0);
+        const result = resolveAttack(actor, target, {
+          weapon: weapon || undefined,
+          thrown: pending.thrown,
+          ...(clickMode ? { clickDamage: bonusDamage } : { bonusDamage })
+        });
+        if (result !== false) {
+          companions.forEach((companion) => {
+            companion.supportTargetId = target.id;
+          });
+        }
+        actor.turnUsed = true;
+        elements.actionText.value = "";
+        finishActorTurn(actor);
+      }
+
+      function chooseClickCombat() {
+        if (!state.pendingCombat) return;
+        elements.combatChoices.hidden = true;
+        elements.combatClickView.hidden = false;
+        elements.combatClickCount.textContent = `Clicks: ${state.pendingCombat.clicks}`;
+      }
+
+      function registerCombatClick() {
+        if (!state.pendingCombat) return;
+        state.pendingCombat.clicks += 1;
+        elements.combatClickCount.textContent = `Clicks: ${state.pendingCombat.clicks}`;
+      }
+
       function resolveAttack(attacker, target, options = {}) {
         const weapon = options.weapon || state.objects.find((item) => item.id === attacker.equippedWeaponId
           && attacker.inventory.includes(item.id) && itemCategory(item) === "weapon" && getObjectDurability(item) > 0);
@@ -4812,7 +4931,8 @@
           attacker.resources[ammo] -= 1;
           if (attacker.resources[ammo] <= 0) delete attacker.resources[ammo];
         }
-        const roll = rollD20(attacker, "strength");
+        const clickCombat = Number.isFinite(options.clickDamage);
+        const roll = clickCombat ? null : rollD20(attacker, "strength");
         const awarenessRoll = attacker.isPlayer ? rollD20(target, "perception") : null;
         const selfHitThreshold = weapon ? 3 : 7;
         const criticalThreshold = weapon ? 14 : 16;
@@ -4820,7 +4940,23 @@
           ? Math.min(20, 11 + distance - (longRange ? 4 : 2))
           : 1;
 
-        if (roll <= selfHitThreshold) {
+        if (clickCombat) {
+          const clickDamage = Math.max(0, Math.floor(options.clickDamage));
+          if (target.isInvulnerable || target.isNetanyahu) {
+            addLog(`<strong>${escapeHtml(attacker.name)}</strong> lands a click attack on <strong>${escapeHtml(target.name)}</strong>, but they cannot be harmed.`);
+          } else if (clickDamage > 0) {
+            const actualDamage = damageAfterArmor(target, clickDamage);
+            addLog(`<strong>${escapeHtml(attacker.name)}</strong> lands a click attack on <strong>${escapeHtml(target.name)}</strong> for ${actualDamage} damage (${clickDamage} click/companion damage).`);
+            applyDamage(target, actualDamage, "is hit", true);
+            if (target.hp <= 0 && yieldsLeather(target)) {
+              const leather = Math.floor(Math.random() * 3) + 1;
+              addResource(attacker, "leather", leather);
+              addLog(`<strong>${escapeHtml(attacker.name)}</strong> collects ${leather} leather from ${escapeHtml(target.name)}.`);
+            }
+          } else {
+            addLog(`<strong>${escapeHtml(attacker.name)}</strong> makes a click attack but lands no hits.`);
+          }
+        } else if (roll <= selfHitThreshold) {
           const damage = Math.max(1, Math.ceil(attacker.maxHp * 0.1));
           addLog(`<strong>${escapeHtml(attacker.name)}</strong> rolls ${roll}/20 and misses ${escapeHtml(target.name)}, hurting themself instead.${weapon ? " The equipped weapon makes attacks risky only on 1–3." : ""}${awarenessRoll === null ? "" : ` Awareness roll: ${awarenessRoll}/20.`}`);
           applyDamage(attacker, damage, "hurts themself");
@@ -4842,11 +4978,12 @@
             const fighterMultiplier = attacker.isPlayer && attacker.characterClass === "fighter"
               && (!critical || protectedCritical) ? 2 : 1;
             const damage = baseDamage * (critical && !protectedCritical ? 3 : 1) * (weapon ? 2 : 1) * fighterMultiplier;
-            const actualDamage = damageAfterArmor(target, damage);
+            const companionAndClickDamage = Math.max(0, Math.floor(options.bonusDamage || 0));
+            const actualDamage = damageAfterArmor(target, damage) + companionAndClickDamage;
             const criticalMessage = protectedCritical
               ? `lands a critical hit on <strong>${escapeHtml(target.name)}</strong>, but their armor negates it`
               : critical ? `lands a critical hit on <strong>${escapeHtml(target.name)}</strong>` : `hits <strong>${escapeHtml(target.name)}</strong>`;
-            addLog(`<strong>${escapeHtml(attacker.name)}</strong> rolls ${roll}/20 and ${criticalMessage} for ${actualDamage} damage${weapon ? ` with ${escapeHtml(weapon.name)}` : ""}.${thrown ? ` The throw required ${throwDistanceThreshold}+ at ${distance} squares.` : ""}${awarenessRoll === null ? "" : ` Awareness roll: ${awarenessRoll}/20.`}`);
+            addLog(`<strong>${escapeHtml(attacker.name)}</strong> rolls ${roll}/20 and ${criticalMessage} for ${actualDamage} damage${companionAndClickDamage ? ` (includes +${companionAndClickDamage} companion/click damage)` : ""}${weapon ? ` with ${escapeHtml(weapon.name)}` : ""}.${thrown ? ` The throw required ${throwDistanceThreshold}+ at ${distance} squares.` : ""}${awarenessRoll === null ? "" : ` Awareness roll: ${awarenessRoll}/20.`}`);
             applyDamage(target, actualDamage, protectedCritical ? "is protected from a critical hit" : critical ? "is critically hit" : "is hit", true);
             if (target.hp <= 0 && yieldsLeather(target)) {
               const leather = Math.floor(Math.random() * 3) + 1;
@@ -5430,10 +5567,26 @@
           return;
         }
 
-        if (/\b(visit|enter|go to|shop|buy|sell)\b.*\b(shop|store|market)\b|\b(shop|store|market)\b/i.test(actionText)) {
-          const city = cityAtLocation(actor.location);
+        if (/^\s*enter\b/i.test(actionText) && !/\b(shop|store|market)\b/i.test(actionText)) {
+          const city = findCityNamedInAction(actionText);
           if (!city) {
-            addLog("You must be in a city to visit its shop.");
+            addLog("To enter a city, type “enter [city name]” using a city shown on the map.");
+          } else if (distanceBetween(actor, city) > 1) {
+            addLog(`You must be within 1 km of ${escapeHtml(city.name)} to enter it.`);
+          } else {
+            actor.cityId = city.id;
+            addLog(`<strong>${escapeHtml(actor.name)}</strong> enters ${escapeHtml(city.name)}.`);
+          }
+          elements.actionText.value = "";
+          render();
+          return;
+        }
+
+        if (/\b(visit|enter|go to|shop|buy|sell)\b.*\b(shop|store|market)\b|\b(shop|store|market)\b/i.test(actionText)) {
+          const city = actor.cityId ? state.cities.find((entry) => entry.id === actor.cityId) : null;
+          if (!city || distanceBetween(actor, city) > 1) {
+            actor.cityId = "";
+            addLog("Enter a city from within 1 km before visiting its shop.");
             render();
             return;
           }
@@ -5756,19 +5909,9 @@
             render();
             return;
           }
-          if (resolveAttack(actor, target, thrown ? { weapon, thrown: true } : {}) === false) {
-            elements.actionText.value = "";
-            render();
-            return;
-          }
-          state.entities.filter((entity) =>
-            entity.isSummonedCompanion && entity.ownerId === actor.id && entity.hp > 0
-          ).forEach((companion) => {
-            companion.supportTargetId = target.id;
-          });
-          actor.turnUsed = true;
           elements.actionText.value = "";
-          finishActorTurn(actor);
+          openCombatDialog(actor, target, thrown ? { weapon, thrown: true } : {});
+          render();
           return;
         }
 
@@ -5825,7 +5968,7 @@
         resolveActionCore(event);
 
         if (!actor?.isPlayer) return;
-        if (!isTravelAction && diceRollNumber === startingRollNumber) {
+        if (!state.pendingCombat && !isTravelAction && diceRollNumber === startingRollNumber) {
           rollD20(actor, actionStat(actionText));
         }
         if (!state.pickpocket
@@ -5834,6 +5977,7 @@
           && !state.pendingSummonerId
           && !state.pendingQuest
           && !state.pendingShop
+          && !state.pendingCombat
           && Number.isFinite(actor.pendingStaminaCost)
           && !actor.turnUsed
           && state.currentIndex === actorIndex
@@ -5904,7 +6048,7 @@
 
       function scheduleAiTurn() {
         if (aiTurnTimer) clearTimeout(aiTurnTimer);
-        if (state.pickpocket || state.relationshipEvent || state.demonBargain || state.pendingSummonerId || state.pendingQuest || state.pendingShop) return;
+        if (state.pickpocket || state.relationshipEvent || state.demonBargain || state.pendingSummonerId || state.pendingQuest || state.pendingShop || state.pendingCombat) return;
         if (state.entities.some((entity) => entity.isPlayer && entity.hp <= 0)) return;
         const activeEntity = state.entities[state.currentIndex];
         if (activeEntity && !activeEntity.isPlayer && !activeEntity.turnUsed) {
@@ -6019,7 +6163,7 @@
         }
 
         if (actor.cityResident && player && state.playerQuestRequestDay !== state.day
-          && actor.cityId === cityAtLocation(player.location)?.id && sameMapSquare(actor, player)
+          && actor.cityId === player.cityId && sameMapSquare(actor, player)
           && Math.random() < 0.02) {
           state.playerQuestRequestDay = state.day;
           askPlayerToAssignQuest(actor);
@@ -6171,10 +6315,6 @@
         finishActorTurn(actor, true);
       }
 
-      function resetRound() {
-        sleepThroughDay(state.entities[state.currentIndex]);
-      }
-
       function setupEvents() {
         elements.playerSetupForm.addEventListener("submit", (event) => {
           event.preventDefault();
@@ -6248,6 +6388,14 @@
           if (!state.pendingQuest) return;
           finishPendingQuestTurn(`${escapeHtml(state.pendingQuest.requesterName)} receives no agreement and moves on.`);
         });
+        elements.combatRollButton.addEventListener("click", () => finishPlayerAttack(false));
+        elements.combatClickButton.addEventListener("click", chooseClickCombat);
+        elements.combatAttackClickButton.addEventListener("click", registerCombatClick);
+        elements.combatClickFinishButton.addEventListener("click", () => finishPlayerAttack(true));
+        elements.combatDialog.addEventListener("cancel", (event) => event.preventDefault());
+        elements.combatDialog.addEventListener("click", (event) => {
+          if (event.target === elements.combatDialog) event.preventDefault();
+        });
         elements.shopBuyButton.addEventListener("click", () => {
           elements.shopMenu.hidden = true;
           elements.shopBuyView.hidden = false;
@@ -6285,7 +6433,6 @@
         elements.shopDialog.addEventListener("click", (event) => {
           if (event.target === elements.shopDialog) event.preventDefault();
         });
-        elements.newRoundBtn.addEventListener("click", resetRound);
         elements.clearLogBtn.addEventListener("click", () => {
           state.log = [];
           render();
