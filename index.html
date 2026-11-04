@@ -114,6 +114,10 @@
 
       .world-status p { margin: 0; }
       .world-status .quest-status { flex-basis: 100%; }
+      .player-stamina { display: grid; min-width: 220px; gap: 4px; }
+      .player-stamina progress { width: 100%; accent-color: #4ade80; }
+      .shop-stock { display: grid; gap: 8px; max-height: 48vh; overflow-y: auto; }
+      .shop-stock-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
 
       .panel {
         background: var(--panel);
@@ -498,6 +502,33 @@
 
       .entity-health-fill.low { background: var(--warning); }
       .entity-health-fill.critical { background: var(--bad); }
+      .entity-stamina {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .entity-stamina-value {
+        flex: 0 0 auto;
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 700;
+      }
+
+      .entity-stamina-track {
+        flex: 1;
+        height: 7px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.2);
+      }
+
+      .entity-stamina-fill {
+        height: 100%;
+        border-radius: inherit;
+        background: #4ade80;
+        transition: width 0.25s ease;
+      }
 
       .entity-kind {
         padding: 5px 9px;
@@ -855,7 +886,7 @@
         <div class="topbar-actions">
           <button type="button" id="mapBtn" class="ghost settings-button" aria-label="Map" title="Map">🗺️</button>
           <button type="button" id="settingsBtn" class="ghost settings-button" aria-label="Settings" title="Settings">⚙</button>
-          <button id="newRoundBtn" class="secondary">New Round</button>
+          <button id="newRoundBtn" class="secondary">Sleep</button>
         </div>
       </header>
 
@@ -885,7 +916,7 @@
                 What do they do? Type a creature's name to talk to or attack it.
                 <input id="actionText" type="text" placeholder="Explore the ruins, or summon Netanyahu..." required />
               </label>
-              <p>Most actions require a d20 roll. Walking, running, and sprinting do not. Summon Netanyahu with 15+, then summon Gadi Eizenkot to challenge him. Voters need a charisma roll of 7+.</p>
+              <p>Actions spend stamina; when everyone is exhausted, a new day begins. Sleep at 10 stamina or less to advance the day. Most actions require a d20 roll; walking, running, and sprinting do not. Visit a city shop to buy or sell.</p>
 
               <div id="diceTray" class="dice-tray" aria-live="polite">
                 <p class="dice-result-status">Ready to roll</p>
@@ -929,6 +960,34 @@
                   <button type="button" class="ghost" id="questDeclineButton">Decline</button>
                 </div>
               </form>
+            </dialog>
+            <dialog id="shopDialog" class="modal-dialog">
+              <section class="dialog-content">
+                <h2 id="shopTitle">City Shop</h2>
+                <p id="shopMessage">What would you like to do?</p>
+                <div id="shopMenu" class="creation-choices">
+                  <button type="button" class="secondary" id="shopBuyButton">Buy</button>
+                  <button type="button" class="secondary" id="shopSellButton">Sell</button>
+                  <button type="button" class="ghost" id="shopLeaveButton">Leave shop</button>
+                </div>
+                <section id="shopBuyView" hidden>
+                  <div id="shopStock" class="shop-stock"></div>
+                  <button type="button" class="ghost" id="shopBuyBackButton">Back</button>
+                </section>
+                <section id="shopSellView" hidden>
+                  <label>
+                    Sell from
+                    <select id="shopSellerSelect"></select>
+                  </label>
+                  <label>
+                    Item name
+                    <input id="shopSellItemName" type="text" maxlength="60" placeholder="Type an item in the inventory" />
+                  </label>
+                  <button type="button" class="secondary" id="shopSellSubmitButton">Sell item</button>
+                  <div id="shopSellInventory" class="shop-stock"></div>
+                  <button type="button" class="ghost" id="shopSellBackButton">Back</button>
+                </section>
+              </section>
             </dialog>
             <dialog id="relationshipDialog" class="modal-dialog">
             <section id="relationshipEvent" class="dialog-content">
@@ -1059,7 +1118,7 @@
     <dialog id="mapDialog" class="modal-dialog">
       <section class="dialog-content">
         <h2>World Map</h2>
-        <p>Each interaction square is 500 meters. The illustrated map covers approximately 10,800 × 6,000 km; grid lines are simplified at this world-scale view. Gold markers show cities.</p>
+        <p>Each interaction square is 500 meters. The illustrated map covers approximately 10,800 × 6,000 km; grid lines are simplified at this world-scale view. Gold markers show cities, with a shop in each one.</p>
         <svg id="worldMap" class="world-map" viewBox="0 0 10800 6000" role="img" aria-label="Illustrated map showing rivers, forests, and creature locations"></svg>
         <div class="dialog-actions"><button type="button" class="ghost small" data-close-dialog="mapDialog">Close</button></div>
       </section>
@@ -1086,6 +1145,7 @@
         demonContracts: [],
         cities: [],
         cityPopulationSeeded: false,
+        pendingShop: null,
         quests: [],
         pendingQuest: null,
         turnCounter: 0,
@@ -1176,7 +1236,23 @@
         questAmount: document.getElementById("questAmount"),
         questPrimaryButton: document.getElementById("questPrimaryButton"),
         questNegotiateButton: document.getElementById("questNegotiateButton"),
-        questDeclineButton: document.getElementById("questDeclineButton")
+        questDeclineButton: document.getElementById("questDeclineButton"),
+        shopDialog: document.getElementById("shopDialog"),
+        shopTitle: document.getElementById("shopTitle"),
+        shopMessage: document.getElementById("shopMessage"),
+        shopMenu: document.getElementById("shopMenu"),
+        shopBuyButton: document.getElementById("shopBuyButton"),
+        shopSellButton: document.getElementById("shopSellButton"),
+        shopLeaveButton: document.getElementById("shopLeaveButton"),
+        shopBuyView: document.getElementById("shopBuyView"),
+        shopStock: document.getElementById("shopStock"),
+        shopBuyBackButton: document.getElementById("shopBuyBackButton"),
+        shopSellView: document.getElementById("shopSellView"),
+        shopSellerSelect: document.getElementById("shopSellerSelect"),
+        shopSellItemName: document.getElementById("shopSellItemName"),
+        shopSellSubmitButton: document.getElementById("shopSellSubmitButton"),
+        shopSellInventory: document.getElementById("shopSellInventory"),
+        shopSellBackButton: document.getElementById("shopSellBackButton")
       };
 
       function randomFrom(list) {
@@ -1491,6 +1567,32 @@
         return state.cities.find((city) => distanceBetween({ location }, { location: city.location }) <= CITY_RADIUS_KM) || null;
       }
 
+      function actionStaminaCost(actionText, actor) {
+        const text = actionText.toLowerCase();
+        if (/\bsleep\b/.test(text) && !/\bsleep\s+(?:with|together)\b/.test(text) && actor.stamina <= 10) return 0;
+        if (/\b(attack|fight|strike|kill|throw)\b/.test(text)) return 20;
+        if (/\b(craft|build|repair|upgrade|train|summon|mine|chop)\b/.test(text)) return 20;
+        if (/\b(search|gather|forage|pickpocket|steal)\b/.test(text)) return 12;
+        if (/\b(talk|ask|tell|trade|quest|buy|sell|shop|visit|enter)\b/.test(text)) return 10;
+        if (/\b(walk|run|sprint|travel|move)\b/.test(text)) return 8;
+        return 10;
+      }
+
+      function chargeStaminaForAction(actor) {
+        if (!actor || !Number.isFinite(actor.pendingStaminaCost)) return;
+        const cost = Math.max(0, actor.pendingStaminaCost);
+        actor.stamina = Math.max(0, (actor.stamina ?? 100) - cost);
+        actor.pendingStaminaCost = null;
+      }
+
+      function refreshStaminaCapacity(actor) {
+        const nextMax = Math.min(200, 100 + Math.max(0, actor.skillPoints?.agility || 0) * 10);
+        const previousMax = actor.maxStamina ?? 100;
+        actor.maxStamina = nextMax;
+        actor.stamina = Math.min(nextMax, actor.stamina ?? nextMax);
+        if (nextMax > previousMax) actor.stamina = Math.min(nextMax, actor.stamina + nextMax - previousMax);
+      }
+
       function isEntityVisibleToPlayer(entity) {
         if (!entity.cityId || entity.isPlayer) return true;
         const player = currentPlayer();
@@ -1545,6 +1647,23 @@
       const cityNameStarts = ["Alder", "Bright", "Cedar", "Dawn", "Eagle", "Fair", "Gold", "Haven", "Iron", "Juniper", "Kings", "Lumen", "Moon", "North", "Oak", "Pine", "Quiet", "River", "Silver", "Thorn"];
       const cityNameEnds = ["bay", "bridge", "crest", "fall", "field", "ford", "gate", "haven", "meadow", "mere", "reach", "rest", "ridge", "rock", "shore", "stead", "vale", "watch", "wick", "wood"];
       const givenNames = ["Ari", "Bryn", "Cato", "Dara", "Eli", "Fara", "Galen", "Hana", "Ivo", "Jori", "Kira", "Lio", "Mira", "Niko", "Orin", "Pia", "Quin", "Rhea", "Soren", "Tavi", "Uma", "Vera", "Wren", "Yara", "Zane"];
+      const shopCatalog = [
+        { name: "Wooden Knife", type: "Weapon", category: "weapon", icon: "🔪", durability: 20, price: 35 },
+        { name: "Stone Knife", type: "Weapon", category: "weapon", icon: "🗡️", durability: 35, price: 60 },
+        { name: "Iron Knife", type: "Weapon", category: "weapon", icon: "🗡️", durability: 60, price: 120 },
+        { name: "Bow", type: "Weapon", category: "weapon", icon: "🏹", durability: 35, range: 2, ammo: "arrows", price: 140 },
+        { name: "Leather Armor", type: "Armor", category: "armor", icon: "🛡️", durability: 40, price: 110 },
+        { name: "Wooden Shield", type: "Armor", category: "armor", icon: "🛡️", durability: 30, price: 75 },
+        { name: "Trail Ration", type: "Food", category: "food", icon: "🥖", price: 12 },
+        { name: "Wild Berries", type: "Food", category: "food", icon: "🍓", price: 8 },
+        { name: "Arrows", type: "Ammunition", category: "ammunition", icon: "🏹", amount: 5, price: 25 },
+        { name: "Bullets", type: "Ammunition", category: "ammunition", icon: "🔸", amount: 5, price: 40 },
+        { name: "Throwing Knives", type: "Ammunition", category: "ammunition", icon: "🔪", amount: 5, price: 50 },
+        { name: "Pickaxe", type: "Tool", category: "tool", icon: "⛏️", durability: 40, price: 80 },
+        { name: "Axe", type: "Tool", category: "tool", icon: "🪓", durability: 40, price: 80 },
+        { name: "Hammer", type: "Tool", category: "tool", icon: "🔨", durability: 50, price: 75 },
+        { name: "Iron Armor", type: "Armor", category: "armor", icon: "🛡️", durability: 70, price: 190 }
+      ];
 
       function pointInPolygon(x, y, polygon) {
         let inside = false;
@@ -1598,7 +1717,14 @@
               name,
               race: group.race,
               icon: group.icon,
-              location: randomCityLocation(state.cities)
+              location: randomCityLocation(state.cities),
+              shop: {
+                stock: shopCatalog.map((item) => ({
+                  ...item,
+                  maxDurability: item.durability ?? null,
+                  description: `${item.name}, available at ${name}'s city shop.`
+                }))
+              }
             };
             state.cities.push(city);
           }
@@ -2105,10 +2231,12 @@
         const actorId = state.deferredTurnActorId;
         state.deferredTurnActorId = null;
         state.relationshipEvent = null;
-        render();
         const actor = state.entities.find((entity) => entity.id === actorId);
         if (actor && actor.hp > 0) finishActorTurn(actor, true);
-        else scheduleAiTurn();
+        else {
+          render();
+          scheduleAiTurn();
+        }
       }
 
       function establishRelationship(first, second) {
@@ -2453,6 +2581,7 @@
       }
 
       function advanceTurn() {
+        chargeStaminaForAction(state.entities[state.currentIndex]);
         if (!state.entities.length) {
           state.currentIndex = 0;
           clearDiceResults();
@@ -2469,7 +2598,8 @@
           let found = false;
           for (let offset = 1; offset <= state.entities.length; offset += 1) {
             const index = (state.currentIndex + offset) % state.entities.length;
-            if (!state.entities[index].turnUsed) {
+            const candidate = state.entities[index];
+            if (!candidate.turnUsed && candidate.stamina > 0 && candidate.hp > 0) {
               state.currentIndex = index;
               found = true;
               break;
@@ -2477,17 +2607,21 @@
           }
 
           if (!found) {
-            state.round += 1;
-            state.day += 1;
-            state.turnCounter += 1;
-            wearItemsForNewDay();
-            state.entities.forEach((entity) => {
-              entity.turnUsed = false;
-            });
-            state.currentIndex = 0;
-            progressRelationships();
-            addLog(`Day ${state.day} begins.`);
-            processDemonContracts();
+            if (state.entities.some((entity) => entity.hp > 0 && entity.stamina > 0)) {
+              state.round += 1;
+              state.entities.forEach((entity) => {
+                entity.turnUsed = entity.hp <= 0 || entity.stamina <= 0;
+              });
+              const playerIndex = state.entities.findIndex((entity) => entity.isPlayer);
+              state.currentIndex = playerIndex >= 0
+                ? (playerIndex + state.entities.length - 1) % state.entities.length
+                : state.entities.length - 1;
+              addLog(`Time ${state.round} begins.`);
+              continue;
+            } else {
+              advanceDay();
+              return;
+            }
           }
 
           const activeEntity = state.entities[state.currentIndex];
@@ -2524,11 +2658,43 @@
         }
       }
 
+      function advanceDay(sleepingActor = null) {
+        state.day += 1;
+        state.round = 1;
+        state.turnCounter += 1;
+        wearItemsForNewDay();
+        state.entities.forEach((entity) => {
+          if (entity.hp > 0) {
+            entity.stamina = Math.min(entity.maxStamina, (entity.stamina || 0) + (entity.id === sleepingActor?.id ? 100 : 75));
+            entity.turnUsed = false;
+          } else {
+            entity.turnUsed = true;
+          }
+        });
+        const playerIndex = state.entities.findIndex((entity) => entity.isPlayer);
+        state.currentIndex = playerIndex >= 0 ? playerIndex : 0;
+        progressRelationships();
+        addLog(`Day ${state.day} begins. Everyone recovers stamina.`);
+        processDemonContracts();
+      }
+
+      function sleepThroughDay(actor) {
+        if (!actor?.isPlayer || actor.stamina > 10 || actor.turnUsed || actor.busyTurns > 0) return false;
+        rollD20(actor, null);
+        actor.turnUsed = true;
+        chargeStaminaForAction(actor);
+        advanceDay(actor);
+        render();
+        scheduleAiTurn();
+        return true;
+      }
+
       function ensureTurnPointer() {
         if (!state.entities.length) {
           state.currentIndex = 0;
           return;
         }
+        if (state.pickpocket || state.relationshipEvent || state.demonBargain || state.pendingSummonerId || state.pendingQuest || state.pendingShop) return;
 
         if (state.currentIndex >= state.entities.length) {
           state.currentIndex = 0;
@@ -2550,7 +2716,7 @@
 
         if (!state.entities.length) {
           elements.turnOrder.innerHTML = '<div class="empty-state">Create your character to start the story.</div>';
-          elements.roundBadge.textContent = `Day ${state.day}`;
+          elements.roundBadge.textContent = `Day ${state.day} · Time ${state.round}`;
           return;
         }
 
@@ -2578,9 +2744,10 @@
 
           const status = document.createElement("div");
           status.className = "turn-status";
-          status.textContent = entity.busyTurns > 0
+          const turnState = entity.busyTurns > 0
             ? `Busy: ${entity.busyTurns} turn${entity.busyTurns === 1 ? "" : "s"} remaining`
             : index === state.currentIndex && !entity.turnUsed ? "Current turn" : entity.turnUsed ? "Turn used" : "Waiting";
+          status.textContent = `${turnState} · ${entity.stamina}/${entity.maxStamina} SP`;
 
           text.appendChild(title);
           text.appendChild(status);
@@ -2596,7 +2763,7 @@
           elements.turnOrder.appendChild(item);
         });
 
-        elements.roundBadge.textContent = `Day ${state.day}`;
+        elements.roundBadge.textContent = `Day ${state.day} · Time ${state.round}`;
       }
 
       function renderEntityList() {
@@ -2691,6 +2858,26 @@
           healthTrack.appendChild(healthFill);
           health.appendChild(healthValue);
           health.appendChild(healthTrack);
+
+          const stamina = document.createElement("div");
+          stamina.className = "entity-stamina";
+          const staminaValue = document.createElement("span");
+          staminaValue.className = "entity-stamina-value";
+          staminaValue.textContent = `${entity.stamina}/${entity.maxStamina} SP`;
+          const staminaTrack = document.createElement("div");
+          staminaTrack.className = "entity-stamina-track";
+          staminaTrack.setAttribute("role", "progressbar");
+          staminaTrack.setAttribute("aria-label", `${entity.name} stamina`);
+          staminaTrack.setAttribute("aria-valuemin", "0");
+          staminaTrack.setAttribute("aria-valuemax", String(entity.maxStamina));
+          staminaTrack.setAttribute("aria-valuenow", String(entity.stamina));
+          staminaTrack.setAttribute("aria-valuetext", `${entity.stamina} of ${entity.maxStamina} SP`);
+          const staminaFill = document.createElement("div");
+          staminaFill.className = "entity-stamina-fill";
+          staminaFill.style.width = `${entity.maxStamina > 0 ? Math.max(0, Math.min(100, entity.stamina / entity.maxStamina * 100)) : 0}%`;
+          staminaTrack.appendChild(staminaFill);
+          stamina.appendChild(staminaValue);
+          stamina.appendChild(staminaTrack);
 
           const stats = document.createElement("dl");
           stats.className = "entity-stats";
@@ -2846,11 +3033,11 @@
 
           const statusBadge = document.createElement("span");
           statusBadge.className = "mini-badge";
-          statusBadge.textContent = entity.turnUsed ? "Turn used" : "Ready";
+          statusBadge.textContent = `${entity.turnUsed ? "Turn used" : "Ready"} · ${entity.stamina}/${entity.maxStamina} SP`;
 
           const roundBadge = document.createElement("span");
           roundBadge.className = "mini-badge";
-          roundBadge.textContent = `Day ${state.day}`;
+          roundBadge.textContent = `Day ${state.day} · Time ${state.round}`;
 
           badges.appendChild(kind);
           badges.appendChild(statusBadge);
@@ -2972,6 +3159,7 @@
           lineup.appendChild(cardActions);
           meta.appendChild(lineup);
           meta.appendChild(health);
+          meta.appendChild(stamina);
           if (relationshipsPanel) meta.appendChild(relationshipsPanel);
           meta.appendChild(stats);
           meta.appendChild(traitPanel);
@@ -2996,7 +3184,7 @@
         });
 
         const activeEntity = state.entities[state.currentIndex];
-        const playerTurn = Boolean(activeEntity && activeEntity.isPlayer && activeEntity.hp > 0 && !activeEntity.turnUsed && !state.pickpocket && !state.relationshipEvent && !state.pendingSummonerId && !state.pendingQuest);
+        const playerTurn = Boolean(activeEntity && activeEntity.isPlayer && activeEntity.hp > 0 && activeEntity.stamina > 0 && !activeEntity.turnUsed && !state.pickpocket && !state.relationshipEvent && !state.pendingSummonerId && !state.pendingQuest && !state.pendingShop);
         elements.turnPrompt.textContent = activeEntity && activeEntity.isPlayer && activeEntity.hp <= 0
             ? "You have been defeated."
           : playerTurn ? "Your turn" : activeEntity && !isEntityVisibleToPlayer(activeEntity)
@@ -3006,7 +3194,8 @@
         Array.from(elements.actionForm.elements).forEach((control) => {
           control.disabled = !playerTurn;
         });
-        elements.newRoundBtn.disabled = Boolean(state.pickpocket || state.relationshipEvent || elements.summonDialog.open || elements.questDialog.open || state.entities.some((entity) => entity.busyTurns > 0) || (activeEntity && activeEntity.isPlayer && activeEntity.hp <= 0));
+        elements.newRoundBtn.textContent = "Sleep";
+        elements.newRoundBtn.disabled = Boolean(!activeEntity?.isPlayer || activeEntity.stamina > 10 || state.pickpocket || state.relationshipEvent || elements.summonDialog.open || elements.questDialog.open || elements.shopDialog.open || state.entities.some((entity) => entity.busyTurns > 0) || (activeEntity && activeEntity.isPlayer && activeEntity.hp <= 0));
         renderPickpocketPanel();
         renderRelationshipEvent();
         renderQuestStatus();
@@ -3111,6 +3300,137 @@
         });
       }
 
+      function openCityShop(actor, city) {
+        state.pendingShop = { actorId: actor.id, cityId: city.id };
+        elements.shopTitle.textContent = `${city.name} Shop`;
+        elements.shopMessage.textContent = "What would you like to do?";
+        elements.shopMenu.hidden = false;
+        elements.shopBuyView.hidden = true;
+        elements.shopSellView.hidden = true;
+        elements.shopSellItemName.value = "";
+        renderShopStock(city);
+        renderShopSellers(actor);
+        if (!elements.shopDialog.open) elements.shopDialog.showModal();
+      }
+
+      function renderShopStock(city) {
+        elements.shopStock.replaceChildren();
+        if (!city.shop.stock.length) {
+          elements.shopStock.textContent = "The shop is out of stock.";
+          return;
+        }
+        city.shop.stock.forEach((item, index) => {
+          const row = document.createElement("div");
+          row.className = "shop-stock-item";
+          const label = document.createElement("span");
+          label.textContent = `${item.icon} ${item.name} · ${item.price} coins`;
+          const buyButton = document.createElement("button");
+          buyButton.type = "button";
+          buyButton.className = "secondary small";
+          buyButton.textContent = "Buy";
+          buyButton.addEventListener("click", () => buyShopItem(index));
+          row.append(label, buyButton);
+          elements.shopStock.appendChild(row);
+        });
+      }
+
+      function renderShopSellers(player) {
+        const sellers = [player, ...state.entities.filter((entity) =>
+          entity.isSummonedCompanion && entity.ownerId === player.id
+        )];
+        elements.shopSellerSelect.replaceChildren();
+        sellers.forEach((seller) => {
+          const option = document.createElement("option");
+          option.value = seller.id;
+          option.textContent = seller.id === player.id ? `${seller.name} (you)` : seller.name;
+          elements.shopSellerSelect.appendChild(option);
+        });
+        renderShopSellerInventory();
+      }
+
+      function renderShopSellerInventory() {
+        elements.shopSellInventory.replaceChildren();
+        const seller = state.entities.find((entity) => entity.id === elements.shopSellerSelect.value);
+        const items = (seller?.inventory || [])
+          .map((itemId) => state.objects.find((item) => item.id === itemId))
+          .filter(Boolean);
+        if (!items.length) {
+          elements.shopSellInventory.textContent = "This inventory is empty.";
+          return;
+        }
+        items.forEach((item) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "ghost small";
+          button.textContent = `${item.icon} ${item.name}`;
+          button.addEventListener("click", () => {
+            elements.shopSellItemName.value = item.name;
+          });
+          elements.shopSellInventory.appendChild(button);
+        });
+      }
+
+      function finishShopAction(message) {
+        const pending = state.pendingShop;
+        state.pendingShop = null;
+        elements.shopDialog.close();
+        if (message) addLog(message);
+        const actor = state.entities.find((entity) => entity.id === pending?.actorId);
+        if (actor) {
+          actor.turnUsed = true;
+          finishActorTurn(actor);
+        } else {
+          render();
+        }
+      }
+
+      function buyShopItem(stockIndex) {
+        const pending = state.pendingShop;
+        const actor = state.entities.find((entity) => entity.id === pending?.actorId);
+        const city = state.cities.find((entry) => entry.id === pending?.cityId);
+        const item = city?.shop.stock[stockIndex];
+        if (!actor || !city || !item) return;
+        if (actor.money < item.price) {
+          elements.shopMessage.textContent = `You need ${item.price} coins to buy ${item.name}, but you only have ${actor.money} coins.`;
+          return;
+        }
+        actor.money -= item.price;
+        city.shop.stock.splice(stockIndex, 1);
+        const purchased = { ...item, id: makeId(), lastDurabilityDay: state.day };
+        state.objects.push(purchased);
+        actor.inventory.push(purchased.id);
+        finishShopAction(`<strong>${escapeHtml(actor.name)}</strong> buys ${escapeHtml(purchased.name)} for ${item.price} coins.`);
+      }
+
+      function sellShopItem() {
+        const pending = state.pendingShop;
+        const player = state.entities.find((entity) => entity.id === pending?.actorId);
+        const city = state.cities.find((entry) => entry.id === pending?.cityId);
+        const seller = state.entities.find((entity) => entity.id === elements.shopSellerSelect.value);
+        const requestedName = elements.shopSellItemName.value.trim().toLowerCase();
+        if (!player || !city || !seller || !requestedName) {
+          elements.shopMessage.textContent = "You don't have that in your inventory.";
+          return;
+        }
+        const item = seller.inventory
+          .map((itemId) => state.objects.find((object) => object.id === itemId))
+          .find((object) => object && object.name.toLowerCase() === requestedName);
+        if (!item) {
+          elements.shopMessage.textContent = "You don't have that in your inventory.";
+          return;
+        }
+        const salePrice = Math.max(1, Math.floor((item.shopPrice || 10) / 2));
+        seller.inventory = seller.inventory.filter((itemId) => itemId !== item.id);
+        if (seller.equippedWeaponId === item.id) seller.equippedWeaponId = null;
+        if (seller.equippedArmorId === item.id) seller.equippedArmorId = null;
+        player.money += salePrice;
+        item.price = salePrice * 2;
+        item.shopPrice = item.price;
+        city.shop.stock.push(item);
+        state.objects = state.objects.filter((object) => object.id !== item.id);
+        finishShopAction(`<strong>${escapeHtml(player.name)}</strong> sells ${escapeHtml(item.name)} from ${escapeHtml(seller.name)}'s inventory for ${salePrice} coins.`);
+      }
+
       function renderMap() {
         const gridLines = [];
         for (let x = 0; x <= state.worldWidth; x += 500) {
@@ -3145,7 +3465,7 @@
           return `<g><title>${escapeHtml(entity.name)} — ${escapeHtml(entity.type)} (${Math.floor(x / MAP_SQUARE_KM)}, ${Math.floor(y / MAP_SQUARE_KM)} grid square)</title><circle cx="${x}" cy="${y}" r="45" fill="${entity.isPlayer ? "#22c1ff" : "#8b5cf6"}" stroke="#edf3ff" stroke-width="8"></circle><text x="${x}" y="${y + 20}" text-anchor="middle" font-size="72">${escapeHtml(entity.icon || "✨")}</text><text class="world-map-label" x="${x + 60}" y="${y - 12}">${escapeHtml(entity.name)}</text></g>`;
         }).join("");
         const cityMarkers = state.cities.map((city) =>
-          `<g><title>${escapeHtml(city.name)} — ${escapeHtml(city.race)} city (20 residents)</title><circle cx="${city.location.x}" cy="${city.location.y}" r="80" fill="#f3c969" stroke="#312e28" stroke-width="12"></circle><text x="${city.location.x}" y="${city.location.y + 24}" text-anchor="middle" font-size="80">${city.icon}</text><text class="world-map-label" x="${city.location.x + 90}" y="${city.location.y - 20}">${escapeHtml(city.name)}</text></g>`
+          `<g><title>${escapeHtml(city.name)} — ${escapeHtml(city.race)} city (20 residents), with a shop</title><circle cx="${city.location.x}" cy="${city.location.y}" r="80" fill="#f3c969" stroke="#312e28" stroke-width="12"></circle><text x="${city.location.x}" y="${city.location.y + 24}" text-anchor="middle" font-size="80">${city.icon}</text><text x="${city.location.x + 58}" y="${city.location.y - 50}" text-anchor="middle" font-size="52">🏪</text><text class="world-map-label" x="${city.location.x + 90}" y="${city.location.y - 20}">${escapeHtml(city.name)}</text></g>`
         ).join("");
         elements.worldMap.innerHTML = `<rect width="${state.worldWidth}" height="${state.worldHeight}" fill="#397c94"></rect><g transform="scale(120)">${terrain}${forestMarks}</g>${gridLines.join("")}${cityMarkers}${markers}`;
       }
@@ -3743,6 +4063,9 @@
           inventory: [],
           equippedWeaponId: null,
           equippedArmorId: null,
+          stamina: 100,
+          maxStamina: 100,
+          pendingStaminaCost: null,
           turnUsed,
           isPlayer: false
         };
@@ -3815,6 +4138,9 @@
           inventory: [],
           equippedWeaponId: null,
           equippedArmorId: null,
+          stamina: 100,
+          maxStamina: 100,
+          pendingStaminaCost: null,
           turnUsed: false,
           isPlayer: true
         };
@@ -4072,6 +4398,7 @@
           actor.skillPoints[stat] = (actor.skillPoints[stat] || 0) + 5;
           addLog(`<strong>${escapeHtml(actor.name)}</strong> excels at training ${stat} (d20: ${roll}) and gains 5 skill points. Training modifier: ${traitModifier(actor, stat) >= 0 ? "+" : ""}${traitModifier(actor, stat)}.`);
         }
+        if (stat === "agility") refreshStaminaCapacity(actor);
         finishActorTurn(actor, true);
         return true;
       }
@@ -5090,8 +5417,30 @@
         }
 
         const actionText = elements.actionText.value.trim() || "takes a bold action";
+        actor.pendingStaminaCost = actionStaminaCost(actionText, actor);
         const target = findActionTarget(actionText);
         const intent = socialIntent(actionText);
+
+        if (/\bsleep\b/i.test(actionText) && !/\bsleep\s+(?:with|together)\b/i.test(actionText)) {
+          if (!sleepThroughDay(actor)) {
+            addLog("You can sleep to advance to the next day only when you have 10 stamina points or less.");
+            render();
+          }
+          elements.actionText.value = "";
+          return;
+        }
+
+        if (/\b(visit|enter|go to|shop|buy|sell)\b.*\b(shop|store|market)\b|\b(shop|store|market)\b/i.test(actionText)) {
+          const city = cityAtLocation(actor.location);
+          if (!city) {
+            addLog("You must be in a city to visit its shop.");
+            render();
+            return;
+          }
+          openCityShop(actor, city);
+          render();
+          return;
+        }
 
         if (/\bquest\b/i.test(actionText)) {
           if (!target) {
@@ -5483,6 +5832,9 @@
           && !state.relationshipEvent
           && !state.demonBargain
           && !state.pendingSummonerId
+          && !state.pendingQuest
+          && !state.pendingShop
+          && Number.isFinite(actor.pendingStaminaCost)
           && !actor.turnUsed
           && state.currentIndex === actorIndex
           && state.day === startingDay) {
@@ -5493,6 +5845,7 @@
       }
 
       function finishActorTurn(actor) {
+        chargeStaminaForAction(actor);
         if (actor.isPlayer) {
           for (const election of [state.netanyahuElection, state.gadiElection]) {
             if (election?.status !== "campaigning") continue;
@@ -5551,7 +5904,7 @@
 
       function scheduleAiTurn() {
         if (aiTurnTimer) clearTimeout(aiTurnTimer);
-        if (state.pickpocket || state.relationshipEvent || state.demonBargain || state.pendingSummonerId || state.pendingQuest) return;
+        if (state.pickpocket || state.relationshipEvent || state.demonBargain || state.pendingSummonerId || state.pendingQuest || state.pendingShop) return;
         if (state.entities.some((entity) => entity.isPlayer && entity.hp <= 0)) return;
         const activeEntity = state.entities[state.currentIndex];
         if (activeEntity && !activeEntity.isPlayer && !activeEntity.turnUsed) {
@@ -5565,6 +5918,9 @@
         const actor = state.entities[state.currentIndex];
         const player = currentPlayer();
         if (!actor || actor.isPlayer || actor.turnUsed) return;
+        actor.pendingStaminaCost = actor.priority === "combat" ? 20
+          : actor.priority === "building" || actor.priority === "crafting" ? 18
+            : actor.priority === "exploration" || actor.priority === "gathering" ? 12 : 10;
 
         if (progressAssignedQuest(actor)) return;
 
@@ -5816,21 +6172,7 @@
       }
 
       function resetRound() {
-        if (state.entities.some((entity) => entity.busyTurns > 0) || state.entities.some((entity) => entity.isPlayer && entity.hp <= 0)) return;
-
-        state.round += 1;
-        state.day += 1;
-        state.turnCounter += 1;
-        wearItemsForNewDay();
-        state.entities.forEach((entity) => {
-          entity.turnUsed = false;
-        });
-        state.currentIndex = 0;
-        progressRelationships();
-        addLog(`Day ${state.day} begins. Everyone is ready to act again.`);
-        processDemonContracts();
-        render();
-        scheduleAiTurn();
+        sleepThroughDay(state.entities[state.currentIndex]);
       }
 
       function setupEvents() {
@@ -5905,6 +6247,43 @@
         elements.questDeclineButton.addEventListener("click", () => {
           if (!state.pendingQuest) return;
           finishPendingQuestTurn(`${escapeHtml(state.pendingQuest.requesterName)} receives no agreement and moves on.`);
+        });
+        elements.shopBuyButton.addEventListener("click", () => {
+          elements.shopMenu.hidden = true;
+          elements.shopBuyView.hidden = false;
+          elements.shopSellView.hidden = true;
+          elements.shopMessage.textContent = "Choose an item to buy.";
+        });
+        elements.shopSellButton.addEventListener("click", () => {
+          elements.shopMenu.hidden = true;
+          elements.shopBuyView.hidden = true;
+          elements.shopSellView.hidden = false;
+          elements.shopMessage.textContent = "Choose an item from your or a companion's inventory.";
+          renderShopSellerInventory();
+        });
+        elements.shopLeaveButton.addEventListener("click", () => {
+          const actor = state.entities.find((entity) => entity.id === state.pendingShop?.actorId);
+          finishShopAction(actor ? `<strong>${escapeHtml(actor.name)}</strong> leaves the shop.` : "");
+        });
+        elements.shopBuyBackButton.addEventListener("click", () => {
+          elements.shopBuyView.hidden = true;
+          elements.shopMenu.hidden = false;
+          elements.shopMessage.textContent = "What would you like to do?";
+        });
+        elements.shopSellBackButton.addEventListener("click", () => {
+          elements.shopSellView.hidden = true;
+          elements.shopMenu.hidden = false;
+          elements.shopMessage.textContent = "What would you like to do?";
+        });
+        elements.shopSellerSelect.addEventListener("change", renderShopSellerInventory);
+        elements.shopSellSubmitButton.addEventListener("click", sellShopItem);
+        elements.shopDialog.addEventListener("cancel", (event) => {
+          event.preventDefault();
+          const actor = state.entities.find((entity) => entity.id === state.pendingShop?.actorId);
+          finishShopAction(actor ? `<strong>${escapeHtml(actor.name)}</strong> leaves the shop.` : "");
+        });
+        elements.shopDialog.addEventListener("click", (event) => {
+          if (event.target === elements.shopDialog) event.preventDefault();
         });
         elements.newRoundBtn.addEventListener("click", resetRound);
         elements.clearLogBtn.addEventListener("click", () => {
