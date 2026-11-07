@@ -885,6 +885,7 @@
         </div>
         <div class="topbar-actions">
           <button type="button" id="mapBtn" class="ghost settings-button" aria-label="Map" title="Map">🗺️</button>
+          <button type="button" id="humansBtn" class="ghost settings-button" aria-label="Nearby humans" title="Nearby humans">👥</button>
           <button type="button" id="settingsBtn" class="ghost settings-button" aria-label="Settings" title="Settings">⚙</button>
         </div>
       </header>
@@ -1081,7 +1082,7 @@
             <option value="lesbian">Lesbian</option>
           </select>
         </label>
-        <label>
+        <label id="playerStartModeLabel">
           Starting location
           <select id="playerStartMode" required>
             <option value="random">Random location</option>
@@ -1098,7 +1099,7 @@
             <option value="fighter">Fighter — double normal damage, triple critical damage, +400 HP</option>
             <option value="summoner">Summoner — summon up to 3 companions</option>
             <option value="healer">Healer — restore health and build rapport</option>
-            <option value="wizard">Wizard / Witch — spellcasting coming later</option>
+            <option value="wizard">Wizard / Witch — starts at the Wizard Tower with two spells</option>
           </select>
         </label>
         <label>
@@ -1111,6 +1112,7 @@
           <p>Your traits and their stat modifiers are generated automatically. Traits that list HP also change your max HP.</p>
           <ul id="playerTraitGuideList" class="trait-guide-list"></ul>
         </details>
+        <button type="button" id="setupSettingsButton" class="ghost">Settings / Load Game</button>
         <button type="submit" class="primary">Start Game</button>
       </form>
     </dialog>
@@ -1138,6 +1140,30 @@
         <p>Each interaction square is 500 meters. The illustrated map covers approximately 10,800 × 6,000 km; grid lines are simplified at this world-scale view. Gold markers show cities, with a shop in each one.</p>
         <svg id="worldMap" class="world-map" viewBox="0 0 10800 6000" role="img" aria-label="Illustrated map showing rivers, forests, and creature locations"></svg>
         <div class="dialog-actions"><button type="button" class="ghost small" data-close-dialog="mapDialog">Close</button></div>
+      </section>
+    </dialog>
+    <dialog id="nearbyHumansDialog" class="modal-dialog">
+      <section class="dialog-content">
+        <h2>Nearby Humans</h2>
+        <p>Humans within 2 km of your current location.</p>
+        <div id="nearbyHumansList" class="object-list"></div>
+        <div class="dialog-actions"><button type="button" class="ghost small" data-close-dialog="nearbyHumansDialog">Close</button></div>
+      </section>
+    </dialog>
+    <dialog id="settingsDialog" class="modal-dialog">
+      <section class="dialog-content">
+        <h2>Settings</h2>
+        <h3>Save / Load</h3>
+        <label>
+          Save slot
+          <select id="saveSlotSelect"></select>
+        </label>
+        <div class="creation-choices">
+          <button type="button" id="saveGameButton" class="secondary">Save game</button>
+          <button type="button" id="loadGameButton" class="secondary">Load game</button>
+        </div>
+        <p id="saveLoadStatus" role="status" aria-live="polite"></p>
+        <div class="dialog-actions"><button type="button" class="ghost small" data-close-dialog="settingsDialog">Close</button></div>
       </section>
     </dialog>
 
@@ -1168,11 +1194,14 @@
         pendingQuest: null,
         turnCounter: 0,
         worldWidth: 10800,
-        worldHeight: 6000
+        worldHeight: 6000,
+        wizardTower: { name: "Wizard Tower", location: { x: 4800, y: 600 } }
       };
 
       const MAP_SQUARE_KM = 0.5;
       const CITY_RADIUS_KM = 4;
+      const SAVE_SLOT_COUNT = 5;
+      const SAVE_SLOT_PREFIX = "turnmaker-tactics-save-";
       let aiTurnTimer = null;
       let pickpocketClock = null;
       let pickpocketSliderTimer = null;
@@ -1181,6 +1210,7 @@
       let isDiceAnimating = false;
       let diceRollInterval = null;
       let diceRollTimeout = null;
+      let suppressAiActivity = false;
 
       const elements = {
         actionForm: document.getElementById("actionForm"),
@@ -1231,12 +1261,14 @@
         relationshipDialog: document.getElementById("relationshipDialog"),
         playerSetupDialog: document.getElementById("playerSetupDialog"),
         playerSetupForm: document.getElementById("playerSetupForm"),
+        setupSettingsButton: document.getElementById("setupSettingsButton"),
         playerTraitGuideList: document.getElementById("playerTraitGuideList"),
         playerDescription: document.getElementById("playerDescription"),
         playerName: document.getElementById("playerName"),
         playerGender: document.getElementById("playerGender"),
         playerRace: document.getElementById("playerRace"),
         playerStartMode: document.getElementById("playerStartMode"),
+        playerStartModeLabel: document.getElementById("playerStartModeLabel"),
         playerStartCityLabel: document.getElementById("playerStartCityLabel"),
         playerStartCity: document.getElementById("playerStartCity"),
         playerAge: document.getElementById("playerAge"),
@@ -1253,6 +1285,15 @@
         mapBtn: document.getElementById("mapBtn"),
         mapDialog: document.getElementById("mapDialog"),
         worldMap: document.getElementById("worldMap"),
+        humansBtn: document.getElementById("humansBtn"),
+        nearbyHumansDialog: document.getElementById("nearbyHumansDialog"),
+        nearbyHumansList: document.getElementById("nearbyHumansList"),
+        settingsBtn: document.getElementById("settingsBtn"),
+        settingsDialog: document.getElementById("settingsDialog"),
+        saveSlotSelect: document.getElementById("saveSlotSelect"),
+        saveGameButton: document.getElementById("saveGameButton"),
+        loadGameButton: document.getElementById("loadGameButton"),
+        saveLoadStatus: document.getElementById("saveLoadStatus"),
         questDialog: document.getElementById("questDialog"),
         questForm: document.getElementById("questForm"),
         questTitle: document.getElementById("questTitle"),
@@ -1642,6 +1683,10 @@
         return state.entities.filter(isEntityVisibleToPlayer);
       }
 
+      function displayedEntities() {
+        return state.entities.filter((entity) => entity.isPlayer);
+      }
+
       function creatureSpawnLocation(creator, spawnMode) {
         if (spawnMode !== "nearby" || !creator?.location) return randomLocation();
         const angle = Math.random() * Math.PI * 2;
@@ -1702,6 +1747,14 @@
         { name: "Hammer", type: "Tool", category: "tool", icon: "🔨", durability: 50, price: 75 },
         { name: "Iron Armor", type: "Armor", category: "armor", icon: "🛡️", durability: 70, price: 190 }
       ];
+      const spellCatalog = [
+        { name: "Firebolt", turns: 1, mana: 10, type: "damage", damage: 25, range: 2 },
+        { name: "Mend", turns: 1, mana: 15, type: "heal", healing: 20 },
+        { name: "Frost Lance", turns: 2, mana: 25, type: "damage", damage: 50, range: 2 },
+        { name: "Arcane Ward", turns: 3, mana: 35, type: "heal", healing: 60 },
+        { name: "Meteor", turns: 5, mana: 80, type: "damage", damage: 150, range: 2 }
+      ];
+      const startingWizardSpells = ["Firebolt", "Mend"];
 
       function pointInPolygon(x, y, polygon) {
         let inside = false;
@@ -1804,7 +1857,10 @@
         });
         const player = currentPlayer();
         if (player) {
-          if (elements.playerStartMode.value === "city") {
+          if (player.characterClass === "wizard") {
+            player.location = { ...state.wizardTower.location };
+            player.cityId = "";
+          } else if (elements.playerStartMode.value === "city") {
             const startCity = state.cities.find((city) => city.id === elements.playerStartCity.value) || randomFrom(state.cities);
             player.location = { ...startCity.location };
             player.cityId = startCity.id;
@@ -2123,6 +2179,7 @@
       }
 
       function addLog(message, entity = null) {
+        if (suppressAiActivity) return;
         const activeEntity = state.entities[state.currentIndex];
         const player = currentPlayer();
         if (entity?.cityResident && !isEntityVisibleToPlayer(entity)) return;
@@ -2195,6 +2252,12 @@
         lesbianOption.disabled = gender !== "female";
         if (sexualitySelect.value === "gay" && gayOption.disabled) sexualitySelect.value = "straight";
         if (sexualitySelect.value === "lesbian" && lesbianOption.disabled) sexualitySelect.value = "straight";
+      }
+
+      function updatePlayerStartLocationOptions() {
+        const isWizard = elements.playerClass.value === "wizard";
+        elements.playerStartModeLabel.hidden = isWizard;
+        elements.playerStartCityLabel.hidden = isWizard || elements.playerStartMode.value !== "city";
       }
 
       function itemCategory(item) {
@@ -2666,10 +2729,24 @@
           if (activeEntity.busyTurns > 0) {
             activeEntity.busyTurns -= 1;
             activeEntity.turnUsed = true;
-            addLog(`<strong>${escapeHtml(activeEntity.name)}</strong> is busy constructing and skips this turn. ${activeEntity.busyTurns} construction turn${activeEntity.busyTurns === 1 ? "" : "s"} remain.`);
+            if (activeEntity.learningSpell) {
+              if (activeEntity.busyTurns === 0) {
+                activeEntity.knownSpells ||= [];
+                if (!activeEntity.knownSpells.includes(activeEntity.learningSpell)) {
+                  activeEntity.knownSpells.push(activeEntity.learningSpell);
+                }
+                if (activeEntity.isPlayer) addLog(`<strong>${escapeHtml(activeEntity.name)}</strong> finishes learning ${escapeHtml(activeEntity.learningSpell)}.`);
+                if (activeEntity.isPlayer) updatePlayerClassSummary(activeEntity);
+                activeEntity.learningSpell = "";
+              } else if (activeEntity.isPlayer) {
+                addLog(`<strong>${escapeHtml(activeEntity.name)}</strong> continues studying a spell. ${activeEntity.busyTurns} study turn${activeEntity.busyTurns === 1 ? "" : "s"} remain.`);
+              }
+            } else if (activeEntity.isPlayer) {
+              addLog(`<strong>${escapeHtml(activeEntity.name)}</strong> is busy constructing and skips this turn. ${activeEntity.busyTurns} construction turn${activeEntity.busyTurns === 1 ? "" : "s"} remain.`);
+            }
             if (activeEntity.busyTurns === 0 && activeEntity.construction) {
               state.objects.push(activeEntity.construction);
-              addLog(`<strong>${escapeHtml(activeEntity.construction.name)}</strong> is finished and ready.`);
+              if (activeEntity.isPlayer) addLog(`<strong>${escapeHtml(activeEntity.construction.name)}</strong> is finished and ready.`);
               activeEntity.construction = null;
             }
             continue;
@@ -2704,6 +2781,7 @@
         state.entities.forEach((entity) => {
           if (entity.hp > 0) {
             entity.stamina = Math.min(entity.maxStamina, (entity.stamina || 0) + (entity.id === sleepingActor?.id ? 100 : 75));
+            if (entity.characterClass === "wizard") entity.mana = entity.maxMana;
             entity.turnUsed = false;
           } else {
             entity.turnUsed = true;
@@ -2758,7 +2836,7 @@
           return;
         }
 
-        const shownEntities = visibleEntities();
+        const shownEntities = displayedEntities();
         shownEntities.forEach((entity) => {
           const index = state.entities.indexOf(entity);
           const item = document.createElement("div");
@@ -2812,12 +2890,12 @@
           return;
         }
 
-        const shownEntities = visibleEntities();
+        const shownEntities = displayedEntities();
         if (shownEntities.length < state.entities.length) {
           const hiddenCount = state.entities.length - shownEntities.length;
           const hiddenSummary = document.createElement("div");
           hiddenSummary.className = "empty-state";
-          hiddenSummary.textContent = `${hiddenCount} residents in distant cities are out of sight.`;
+          hiddenSummary.textContent = `${hiddenCount} AI character${hiddenCount === 1 ? "" : "s"} hidden. Use the Humans button to see nearby humans.`;
           elements.entityList.appendChild(hiddenSummary);
         }
         shownEntities.forEach((entity) => {
@@ -3086,6 +3164,18 @@
             skinToneBadge.textContent = `Skin: ${entity.skinTone}`;
             badges.appendChild(skinToneBadge);
           }
+          if (entity.characterClass === "healer") {
+            const healingBadge = document.createElement("span");
+            healingBadge.className = "mini-badge";
+            healingBadge.textContent = `Healing power: ${entity.healingPower}/150`;
+            badges.appendChild(healingBadge);
+          }
+          if (entity.characterClass === "wizard") {
+            const spellsBadge = document.createElement("span");
+            spellsBadge.className = "mini-badge";
+            spellsBadge.textContent = `Spells: ${(entity.knownSpells || []).join(", ") || "None"}`;
+            badges.appendChild(spellsBadge);
+          }
 
           if (entity.busyTurns > 0) {
             const constructionBadge = document.createElement("span");
@@ -3198,6 +3288,19 @@
           meta.appendChild(lineup);
           meta.appendChild(health);
           meta.appendChild(stamina);
+          if (entity.characterClass === "wizard") {
+            const mana = document.createElement("div");
+            mana.className = "entity-stamina";
+            const manaValue = document.createElement("span");
+            manaValue.className = "entity-stamina-value";
+            manaValue.textContent = `${entity.mana}/${entity.maxMana} MP`;
+            const manaTrack = document.createElement("progress");
+            manaTrack.max = entity.maxMana || 100;
+            manaTrack.value = entity.mana || 0;
+            manaTrack.setAttribute("aria-label", `${entity.name} mana`);
+            mana.append(manaValue, manaTrack);
+            meta.appendChild(mana);
+          }
           if (relationshipsPanel) meta.appendChild(relationshipsPanel);
           meta.appendChild(stats);
           meta.appendChild(traitPanel);
@@ -3225,9 +3328,7 @@
         const playerTurn = Boolean(activeEntity && activeEntity.isPlayer && activeEntity.hp > 0 && activeEntity.stamina > 0 && !activeEntity.turnUsed && !state.pickpocket && !state.relationshipEvent && !state.pendingSummonerId && !state.pendingQuest && !state.pendingShop && !state.pendingCombat);
         elements.turnPrompt.textContent = activeEntity && activeEntity.isPlayer && activeEntity.hp <= 0
             ? "You have been defeated."
-          : playerTurn ? "Your turn" : activeEntity && !isEntityVisibleToPlayer(activeEntity)
-            ? "Distant city residents are taking their turns..."
-            : activeEntity ? `${activeEntity.name} is taking a turn...` : "No active turn";
+          : playerTurn ? "Your turn" : activeEntity ? "The world is taking its turn..." : "No active turn";
         elements.actionForm.classList.toggle("turn-controls-disabled", !playerTurn);
         Array.from(elements.actionForm.elements).forEach((control) => {
           control.disabled = !playerTurn;
@@ -3495,7 +3596,7 @@
           <text class="map-terrain-label" x="30" y="39">MIRROR LAKE</text>
           <text x="4" y="6" font-size="1.5" fill="#e6f4f1">N ↑</text>
         `;
-        const markers = visibleEntities().map((entity) => {
+        const markers = displayedEntities().map((entity) => {
           const x = entity.location.x;
           const y = entity.location.y;
           return `<g><title>${escapeHtml(entity.name)} — ${escapeHtml(entity.type)} (${Math.floor(x / MAP_SQUARE_KM)}, ${Math.floor(y / MAP_SQUARE_KM)} grid square)</title><circle cx="${x}" cy="${y}" r="45" fill="${entity.isPlayer ? "#22c1ff" : "#8b5cf6"}" stroke="#edf3ff" stroke-width="8"></circle><text x="${x}" y="${y + 20}" text-anchor="middle" font-size="72">${escapeHtml(entity.icon || "✨")}</text><text class="world-map-label" x="${x + 60}" y="${y - 12}">${escapeHtml(entity.name)}</text></g>`;
@@ -3503,7 +3604,10 @@
         const cityMarkers = state.cities.map((city) =>
           `<g><title>${escapeHtml(city.name)} — ${escapeHtml(city.race)} city (20 residents), with a shop</title><circle cx="${city.location.x}" cy="${city.location.y}" r="80" fill="#f3c969" stroke="#312e28" stroke-width="12"></circle><text x="${city.location.x}" y="${city.location.y + 24}" text-anchor="middle" font-size="80">${city.icon}</text><text x="${city.location.x + 58}" y="${city.location.y - 50}" text-anchor="middle" font-size="52">🏪</text><text class="world-map-label" x="${city.location.x + 90}" y="${city.location.y - 20}">${escapeHtml(city.name)}</text></g>`
         ).join("");
-        elements.worldMap.innerHTML = `<rect width="${state.worldWidth}" height="${state.worldHeight}" fill="#397c94"></rect><g transform="scale(120)">${terrain}${forestMarks}</g>${gridLines.join("")}${cityMarkers}${markers}`;
+        const tower = state.wizardTower
+          ? `<g><title>Wizard Tower — entry restricted to Wizards and Witches</title><circle cx="${state.wizardTower.location.x}" cy="${state.wizardTower.location.y}" r="90" fill="#a78bfa" stroke="#312e28" stroke-width="12"></circle><text x="${state.wizardTower.location.x}" y="${state.wizardTower.location.y + 24}" text-anchor="middle" font-size="80">🧙</text><text class="world-map-label" x="${state.wizardTower.location.x + 100}" y="${state.wizardTower.location.y - 20}">Wizard Tower</text></g>`
+          : "";
+        elements.worldMap.innerHTML = `<rect width="${state.worldWidth}" height="${state.worldHeight}" fill="#397c94"></rect><g transform="scale(120)">${terrain}${forestMarks}</g>${gridLines.join("")}${cityMarkers}${tower}${markers}`;
       }
 
       function toggleEquipment(entity, item) {
@@ -4014,7 +4118,128 @@
         renderObjectList();
         renderInventory();
         renderLog();
+        if (elements.nearbyHumansDialog.open) renderNearbyHumans();
         if (elements.mapDialog.open) renderMap();
+      }
+
+      function updatePlayerClassSummary(player) {
+        const descriptions = {
+          fighter: "Fighter: deals double normal damage and triple critical damage, starts with 400 bonus HP, and receives a random weapon and armor.",
+          summoner: "Summoner: summon up to three living companions to assist in combat.",
+          healer: "Healer: starts with 20 healing power, which increases by 5 each time you heal yourself (up to 150). Healing others also raises rapport.",
+          wizard: `Wizard/Witch: starts at the Wizard Tower with ${((player.knownSpells || []).join(", ") || "no spells")}. Type “learn [spell]” to study a spell, or “cast [spell] at [name]” to use one. Known spells: ${(player.knownSpells || []).join(", ")}.`
+        };
+        elements.playerClassSummary.textContent = descriptions[player.characterClass] || "Choose a class when creating your character.";
+      }
+
+      function updateSaveSlotOptions() {
+        const selectedSlot = elements.saveSlotSelect.value || "1";
+        elements.saveSlotSelect.innerHTML = "";
+        try {
+          for (let slot = 1; slot <= SAVE_SLOT_COUNT; slot += 1) {
+            const rawSave = localStorage.getItem(`${SAVE_SLOT_PREFIX}${slot}`);
+            let label = `Slot ${slot} — Empty`;
+            if (rawSave) {
+              try {
+                const save = JSON.parse(rawSave);
+                const date = save.savedAt ? new Date(save.savedAt) : null;
+                label = date && !Number.isNaN(date.getTime())
+                  ? `Slot ${slot} — Saved ${date.toLocaleString()}`
+                  : `Slot ${slot} — Saved game`;
+              } catch (error) {
+                label = `Slot ${slot} — Invalid save`;
+              }
+            }
+            const option = document.createElement("option");
+            option.value = String(slot);
+            option.textContent = label;
+            elements.saveSlotSelect.appendChild(option);
+          }
+          elements.saveSlotSelect.value = selectedSlot;
+        } catch (error) {
+          elements.saveLoadStatus.textContent = `Unable to access saved games: ${error.message}`;
+        }
+      }
+
+      function saveGameToSelectedSlot() {
+        const player = currentPlayer();
+        if (!player) {
+          elements.saveLoadStatus.textContent = "Create a character before saving.";
+          return;
+        }
+        if (state.pendingCombat || state.pendingQuest || state.pendingShop || state.pendingSummonerId
+          || state.pendingProposal || state.relationshipEvent || state.demonBargain || state.pickpocket) {
+          elements.saveLoadStatus.textContent = "Finish the open interaction before saving.";
+          return;
+        }
+        try {
+          const slot = Number(elements.saveSlotSelect.value);
+          if (!Number.isInteger(slot) || slot < 1 || slot > SAVE_SLOT_COUNT) {
+            elements.saveLoadStatus.textContent = "Choose a valid save slot.";
+            return;
+          }
+          localStorage.setItem(`${SAVE_SLOT_PREFIX}${slot}`, JSON.stringify({
+            version: 1,
+            savedAt: new Date().toISOString(),
+            gameState: state
+          }));
+          elements.saveLoadStatus.textContent = `Game saved to Slot ${slot}.`;
+          updateSaveSlotOptions();
+          elements.saveSlotSelect.value = String(slot);
+        } catch (error) {
+          elements.saveLoadStatus.textContent = `Could not save the game: ${error.message}`;
+        }
+      }
+
+      function loadGameFromSelectedSlot() {
+        let loadedSave;
+        try {
+          const slot = Number(elements.saveSlotSelect.value);
+          if (!Number.isInteger(slot) || slot < 1 || slot > SAVE_SLOT_COUNT) {
+            elements.saveLoadStatus.textContent = "Choose a valid save slot.";
+            return;
+          }
+          const rawSave = localStorage.getItem(`${SAVE_SLOT_PREFIX}${slot}`);
+          if (!rawSave) {
+            elements.saveLoadStatus.textContent = `Slot ${slot} is empty.`;
+            return;
+          }
+          loadedSave = JSON.parse(rawSave);
+          const savedState = loadedSave?.gameState;
+          if (loadedSave.version !== 1 || !Array.isArray(savedState?.entities)
+            || !Array.isArray(savedState?.objects) || !Array.isArray(savedState?.cities)
+            || !Number.isFinite(savedState.worldWidth) || !Number.isFinite(savedState.worldHeight)) {
+            throw new Error("The save file has an unsupported or invalid format.");
+          }
+          if (!savedState.entities.some((entity) => entity.isPlayer)) {
+            throw new Error("The save file does not contain a player character.");
+          }
+          if (aiTurnTimer) clearTimeout(aiTurnTimer);
+          aiTurnTimer = null;
+          Object.assign(state, savedState);
+          state.entities.forEach((entity) => {
+            if (entity.isInvulnerable) {
+              entity.hp = Infinity;
+              entity.maxHp = Infinity;
+            }
+            if (entity.characterClass === "wizard") {
+              entity.knownSpells ||= [...startingWizardSpells];
+              entity.maxMana ||= 100;
+              entity.mana ??= entity.maxMana;
+            }
+            if (entity.characterClass === "healer") entity.healingPower ||= 20;
+          });
+          updatePlayerClassSummary(currentPlayer());
+          document.querySelectorAll("dialog[open]").forEach((dialog) => {
+            if (dialog !== elements.settingsDialog) dialog.close();
+          });
+          render();
+          scheduleAiTurn();
+          elements.saveLoadStatus.textContent = `Game loaded from Slot ${elements.saveSlotSelect.value}.`;
+          updateSaveSlotOptions();
+        } catch (error) {
+          elements.saveLoadStatus.textContent = `Could not load the game: ${error.message}`;
+        }
       }
 
       async function findCreatureImage(entity) {
@@ -4099,6 +4324,11 @@
           inventory: [],
           equippedWeaponId: null,
           equippedArmorId: null,
+          knownSpells: [],
+          mana: null,
+          maxMana: null,
+          healingPower: null,
+          learningSpell: "",
           stamina: 100,
           maxStamina: 100,
           pendingStaminaCost: null,
@@ -4174,6 +4404,11 @@
           inventory: [],
           equippedWeaponId: null,
           equippedArmorId: null,
+          knownSpells: playerDetails.characterClass === "wizard" ? [...startingWizardSpells] : [],
+          mana: playerDetails.characterClass === "wizard" ? 100 : null,
+          maxMana: playerDetails.characterClass === "wizard" ? 100 : null,
+          healingPower: playerDetails.characterClass === "healer" ? 20 : null,
+          learningSpell: "",
           stamina: 100,
           maxStamina: 100,
           pendingStaminaCost: null,
@@ -4183,15 +4418,10 @@
 
         player.image = generateAvatarData(player);
         state.entities.push(player);
+        if (player.characterClass === "fighter") giveFighterStartingGear(player);
         registerDescriptionInteractions(player);
         state.currentIndex = 0;
-        const classDescriptions = {
-          fighter: "Fighter: deals double normal damage and triple critical damage, and starts with 400 bonus HP.",
-          summoner: "Summoner: summon up to three living companions to assist in combat.",
-          healer: "Healer: restore your own or another creature's HP; healing others raises rapport.",
-          wizard: "Wizard/Witch: class selected; spellcasting will be added later."
-        };
-        elements.playerClassSummary.textContent = classDescriptions[player.characterClass] || classDescriptions.wizard;
+        updatePlayerClassSummary(player);
         seedCitiesAndPopulations();
         render();
       }
@@ -4250,6 +4480,53 @@
         if (recipe.category === "armor" && !entity.equippedArmorId) entity.equippedArmorId = item.id;
         addLog(`<strong>${escapeHtml(entity.name)}</strong> crafts ${escapeHtml(item.name)} and adds it to their inventory.`);
         return true;
+      }
+
+      function giveFighterStartingGear(player) {
+        const weapons = shopCatalog.filter((item) => item.category === "weapon");
+        const armors = shopCatalog.filter((item) => item.category === "armor");
+        [randomFrom(weapons), randomFrom(armors)].forEach((template) => {
+          const item = {
+            ...template,
+            id: makeId(),
+            maxDurability: template.durability ?? null,
+            lastDurabilityDay: state.day,
+            ammo: template.ammo || (template.name === "Bow" ? "arrows" : null)
+          };
+          state.objects.push(item);
+          player.inventory.push(item.id);
+          if (item.category === "weapon") player.equippedWeaponId = item.id;
+          if (item.category === "armor") player.equippedArmorId = item.id;
+          if (item.ammo) addResource(player, item.ammo, 5);
+        });
+      }
+
+      function renderNearbyHumans() {
+        const player = currentPlayer();
+        elements.nearbyHumansList.innerHTML = "";
+        if (!player) {
+          elements.nearbyHumansList.textContent = "Create a character first.";
+          return;
+        }
+        const humans = state.entities
+          .filter((entity) => entity.id !== player.id && /\bhuman\b/i.test(`${entity.race || ""} ${entity.type || ""}`)
+            && entity.hp > 0 && distanceBetween(player, entity) <= 2)
+          .sort((first, second) => distanceBetween(player, first) - distanceBetween(player, second));
+        if (!humans.length) {
+          elements.nearbyHumansList.textContent = "There are no humans within 2 km.";
+          return;
+        }
+        humans.forEach((human) => {
+          const row = document.createElement("div");
+          row.className = "inventory-item";
+          const name = document.createElement("span");
+          name.textContent = `${human.icon || ""} ${human.name}`;
+          const distance = document.createElement("span");
+          distance.className = "mini-badge";
+          distance.textContent = `${distanceBetween(player, human).toFixed(2)} km`;
+          row.append(name, distance);
+          elements.nearbyHumansList.appendChild(row);
+        });
       }
 
       function resourceForage(actionText, actor) {
@@ -4592,6 +4869,7 @@
         const modifier = entity && stat ? traitModifier(entity, stat) : 0;
         const result = Math.max(1, Math.min(20, rawResult + modifier));
         const activeEntity = state.entities[state.currentIndex];
+        if ((activeEntity && !activeEntity.isPlayer) || (entity && !entity.isPlayer)) return result;
         if (activeEntity?.cityResident && !isEntityVisibleToPlayer(activeEntity)) return result;
         const rollCard = document.createElement("div");
         rollCard.className = "dice-result";
@@ -4680,8 +4958,9 @@
 
       function findActionTarget(actionText) {
         const actionWords = actionText.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
-        const matches = visibleEntities().filter((entity) => {
+        const matches = state.entities.filter((entity) => {
           if (entity.isPlayer || entity.hp <= 0) return false;
+          if (!isEntityVisibleToPlayer(entity)) return false;
           const nameWords = entity.name.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
           return nameWords.length > 0 && actionWords.some((_, start) =>
             nameWords.every((word, offset) => actionWords[start + offset] === word)
@@ -5455,14 +5734,103 @@
           return true;
         }
         const roll = rollD20(actor, "wisdom");
-        const restored = Number.isFinite(target.maxHp) ? Math.min(target.maxHp - target.hp, 5 + roll) : 0;
+        const healingPower = Math.max(20, Math.min(150, actor.healingPower || 20));
+        const restored = Number.isFinite(target.maxHp) ? Math.min(target.maxHp - target.hp, healingPower + Math.floor(roll / 10)) : 0;
         target.hp += restored;
+        if (target === actor) actor.healingPower = Math.min(150, healingPower + 5);
         if (target !== actor) {
           changeRapport(target.id, actor.id, 10);
           changeRapport(actor.id, target.id, 10);
         }
         actor.turnUsed = true;
-        addLog(`<strong>${escapeHtml(actor.name)}</strong> heals ${target === actor ? "themself" : `<strong>${escapeHtml(target.name)}</strong>`} for ${restored} HP (${target.hp}/${target.maxHp}; roll ${roll}/20).${target !== actor ? " Rapport +10." : ""}`);
+        addLog(`<strong>${escapeHtml(actor.name)}</strong> heals ${target === actor ? "themself" : `<strong>${escapeHtml(target.name)}</strong>`} for ${restored} HP (${target.hp}/${target.maxHp}; power ${healingPower}${target === actor ? ` → ${actor.healingPower}` : ""}; roll ${roll}/20).${target !== actor ? " Rapport +10." : ""}`);
+        finishActorTurn(actor);
+        return true;
+      }
+
+      function learnSpellAction(actor, actionText) {
+        const request = actionText.match(/^\s*(?:learn|study)\s+(?:the\s+)?(?:spell\s+)?(.+?)\s*$/i);
+        if (!request) return false;
+        if (actor.characterClass !== "wizard") {
+          addLog("Only a Wizard or Witch can learn spells.");
+          render();
+          return true;
+        }
+        const requestedName = request[1].toLowerCase();
+        const spell = spellCatalog.find((entry) => entry.name.toLowerCase() === requestedName);
+        if (!spell) {
+          addLog(`Choose a spell to learn: ${spellCatalog.map((entry) => `${entry.name} (${entry.turns} turn${entry.turns === 1 ? "" : "s"})`).join(", ")}.`);
+          render();
+          return true;
+        }
+        actor.knownSpells ||= [];
+        if (actor.knownSpells.includes(spell.name)) {
+          addLog(`You already know ${escapeHtml(spell.name)}.`);
+          render();
+          return true;
+        }
+        actor.turnUsed = true;
+        actor.pendingStaminaCost = actionStaminaCost(actionText, actor);
+        if (spell.turns === 1) {
+          actor.knownSpells.push(spell.name);
+          updatePlayerClassSummary(actor);
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> learns ${escapeHtml(spell.name)} in one turn.`);
+        } else {
+          actor.learningSpell = spell.name;
+          actor.busyTurns = spell.turns - 1;
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> begins studying ${escapeHtml(spell.name)}. Learning it takes ${spell.turns} turns in total.`);
+        }
+        elements.actionText.value = "";
+        finishActorTurn(actor);
+        return true;
+      }
+
+      function castSpellAction(actor, actionText, target) {
+        if (!/^\s*cast\b/i.test(actionText)) return false;
+        if (actor.characterClass !== "wizard") {
+          addLog("Only a Wizard or Witch can cast spells.");
+          render();
+          return true;
+        }
+        const castRequest = actionText.match(/^\s*cast\s+(.+?)(?:\s+at\s+(.+))?\s*$/i);
+        const spellName = castRequest?.[1]?.trim().toLowerCase() || "";
+        const spell = spellCatalog.find((entry) => entry.name.toLowerCase() === spellName);
+        if (!spell || !(actor.knownSpells || []).includes(spell.name)) {
+          addLog(`You do not know that spell. Known spells: ${(actor.knownSpells || []).join(", ") || "none"}.`);
+          render();
+          return true;
+        }
+        if (actor.mana < spell.mana) {
+          addLog(`${spell.name} costs ${spell.mana} mana, but you only have ${actor.mana}.`);
+          render();
+          return true;
+        }
+        if (spell.type === "damage") {
+          target ||= findActionTarget(castRequest?.[2] || "");
+          if (!target || target.hp <= 0) {
+            addLog(`Name a living target within ${spell.range} km to cast ${spell.name} at.`);
+            render();
+            return true;
+          }
+          if (distanceBetween(actor, target) > spell.range) {
+            addLog(`${target.name} is too far away for ${spell.name} (maximum range ${spell.range} km).`);
+            render();
+            return true;
+          }
+        }
+        const roll = rollD20(actor, "intelligence");
+        actor.mana -= spell.mana;
+        actor.turnUsed = true;
+        if (spell.type === "damage") {
+          const damage = spell.damage + (roll >= 15 ? 10 : 0);
+          applyDamage(target, damage, `is hit by ${spell.name}`);
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> casts ${escapeHtml(spell.name)} for ${damage} damage (roll ${roll}/20; ${actor.mana}/${actor.maxMana} mana).`);
+        } else {
+          const restored = Math.min(actor.maxHp - actor.hp, spell.healing + Math.floor(roll / 5));
+          actor.hp += restored;
+          addLog(`<strong>${escapeHtml(actor.name)}</strong> casts ${escapeHtml(spell.name)} and restores ${restored} HP (roll ${roll}/20; ${actor.mana}/${actor.maxMana} mana).`);
+        }
+        elements.actionText.value = "";
         finishActorTurn(actor);
         return true;
       }
@@ -5568,6 +5936,24 @@
         }
 
         if (/^\s*enter\b/i.test(actionText) && !/\b(shop|store|market)\b/i.test(actionText)) {
+          if (/^\s*enter\s+(?:the\s+)?wizard tower\s*$/i.test(actionText)) {
+            if (actor.characterClass !== "wizard") {
+              addLog("Only a Wizard or Witch can enter the Wizard Tower.");
+            } else if (distanceBetween(actor, { location: state.wizardTower.location }) > 1) {
+              addLog("You must be within 1 km of the Wizard Tower to enter it.");
+            } else {
+              actor.location = { ...state.wizardTower.location };
+              actor.cityId = "";
+              actor.turnUsed = true;
+              addLog(`<strong>${escapeHtml(actor.name)}</strong> enters the Wizard Tower.`);
+              elements.actionText.value = "";
+              finishActorTurn(actor);
+              return;
+            }
+            elements.actionText.value = "";
+            render();
+            return;
+          }
           const city = findCityNamedInAction(actionText);
           if (!city) {
             addLog("To enter a city, type “enter [city name]” using a city shown on the map.");
@@ -5605,6 +5991,16 @@
             elements.actionText.value = "";
             render();
           }
+          return;
+        }
+
+        if (learnSpellAction(actor, actionText)) {
+          render();
+          return;
+        }
+
+        if (castSpellAction(actor, actionText, target)) {
+          render();
           return;
         }
 
@@ -6058,6 +6454,15 @@
       }
 
       function playAiTurn() {
+        suppressAiActivity = true;
+        try {
+          playAiTurnCore();
+        } finally {
+          suppressAiActivity = false;
+        }
+      }
+
+      function playAiTurnCore() {
         aiTurnTimer = null;
         const actor = state.entities[state.currentIndex];
         const player = currentPlayer();
@@ -6358,8 +6763,9 @@
           updateSexualityOptions(elements.playerGender, elements.playerSexuality);
         });
         elements.playerStartMode.addEventListener("change", () => {
-          elements.playerStartCityLabel.hidden = elements.playerStartMode.value !== "city";
+          updatePlayerStartLocationOptions();
         });
+        elements.playerClass.addEventListener("change", updatePlayerStartLocationOptions);
         elements.openInventory.addEventListener("click", () => {
           renderInventory();
           if (!elements.inventoryDialog.open) elements.inventoryDialog.showModal();
@@ -6368,6 +6774,19 @@
           renderMap();
           if (!elements.mapDialog.open) elements.mapDialog.showModal();
         });
+        elements.humansBtn.addEventListener("click", () => {
+          renderNearbyHumans();
+          if (!elements.nearbyHumansDialog.open) elements.nearbyHumansDialog.showModal();
+        });
+        const openSettings = () => {
+          elements.saveLoadStatus.textContent = "";
+          updateSaveSlotOptions();
+          if (!elements.settingsDialog.open) elements.settingsDialog.showModal();
+        };
+        elements.settingsBtn.addEventListener("click", openSettings);
+        elements.setupSettingsButton.addEventListener("click", openSettings);
+        elements.saveGameButton.addEventListener("click", saveGameToSelectedSlot);
+        elements.loadGameButton.addEventListener("click", loadGameFromSelectedSlot);
         document.querySelectorAll("[data-close-dialog]").forEach((button) => {
           button.addEventListener("click", () => document.getElementById(button.dataset.closeDialog).close());
         });
@@ -6443,6 +6862,7 @@
         setupEvents();
         generateCities();
         updateSexualityOptions(elements.playerGender, elements.playerSexuality);
+        updatePlayerStartLocationOptions();
         renderTraitGuides();
         render();
         elements.playerSetupDialog.showModal();
