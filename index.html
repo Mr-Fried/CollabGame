@@ -916,7 +916,7 @@
                 What do they do? Type a creature's name to talk to or attack it.
                 <input id="actionText" type="text" placeholder="Explore the ruins, or summon Netanyahu..." required />
               </label>
-              <p>Actions spend stamina; when everyone is exhausted, a new day begins. Type “sleep” at 10 stamina or less to advance the day. Enter a city by typing “enter [city name]” from within 1 km. Most actions require a d20 roll; walking, running, and sprinting do not.</p>
+              <p>Actions spend stamina; when everyone is exhausted, a new day begins. Type “sleep” at 10 stamina or less to advance the day. Enter a city by typing “enter [city name]” from within 1 km; then type “enter casino” to visit its casino. Most actions require a d20 roll; walking, running, and sprinting do not.</p>
 
               <div id="diceTray" class="dice-tray" aria-live="polite">
                 <p class="dice-result-status">Ready to roll</p>
@@ -987,6 +987,39 @@
                   <div id="shopSellInventory" class="shop-stock"></div>
                   <button type="button" class="ghost" id="shopSellBackButton">Back</button>
                 </section>
+              </section>
+            </dialog>
+            <dialog id="casinoDialog" class="modal-dialog">
+              <section class="dialog-content">
+                <h2 id="casinoTitle">City Casino</h2>
+                <p id="casinoMessage">Choose a game and wager. You may wager up to 1,000 coins beyond your current balance.</p>
+                <label>
+                  Game
+                  <select id="casinoGame">
+                    <option value="blackjack">Blackjack</option>
+                    <option value="holdem">Texas Hold'em (simplified)</option>
+                    <option value="slots">Slots</option>
+                    <option value="roulette">Roulette</option>
+                    <option value="fate">Fate Wheel (high stakes, nonlethal)</option>
+                  </select>
+                </label>
+                <label id="casinoBetTypeLabel" hidden>
+                  Roulette bet
+                  <select id="casinoBetType">
+                    <option value="red">Red — even payout</option>
+                    <option value="black">Black — even payout</option>
+                    <option value="green">Green — 35× payout</option>
+                  </select>
+                </label>
+                <label>
+                  Wager (coins)
+                  <input id="casinoWager" type="number" min="1" step="1" value="10" />
+                </label>
+                <div class="creation-choices">
+                  <button type="button" id="casinoPlayButton" class="primary">Play</button>
+                  <button type="button" id="casinoLeaveButton" class="ghost">Leave casino</button>
+                </div>
+                <p id="casinoResult" role="status" aria-live="polite"></p>
               </section>
             </dialog>
             <dialog id="combatDialog" class="modal-dialog">
@@ -1163,6 +1196,47 @@
           <button type="button" id="loadGameButton" class="secondary">Load game</button>
         </div>
         <p id="saveLoadStatus" role="status" aria-live="polite"></p>
+        <form id="cheatUnlockForm">
+          <label>
+            Secret code
+            <input id="cheatCodeInput" type="password" autocomplete="off" />
+          </label>
+          <button type="submit" class="secondary">Continue</button>
+          <p id="secretCodeStatus" role="status" aria-live="polite"></p>
+        </form>
+        <section id="cheatControls" hidden>
+          <h4>Edit character</h4>
+          <label>
+            Money (coins; leave blank to keep)
+            <input id="cheatMoneyValue" type="number" step="1" />
+          </label>
+          <label>
+            Relationship with
+            <select id="cheatRelationshipTarget"></select>
+          </label>
+          <label>
+            Relationship (-100 to 100)
+            <input id="cheatRelationshipValue" type="number" min="-100" max="100" />
+          </label>
+          <label>
+            Health (leave blank to keep)
+            <input id="cheatHpValue" type="number" min="0" step="1" />
+          </label>
+          <label>
+            Stamina (leave blank to keep)
+            <input id="cheatSpValue" type="number" min="0" step="1" />
+          </label>
+          <label>
+            Mana (Wizard/Witch only; leave blank to keep)
+            <input id="cheatMpValue" type="number" min="0" step="1" />
+          </label>
+          <button type="button" id="applyCheatsButton" class="secondary">Apply edits</button>
+          <div class="creation-choices">
+            <button type="button" id="cheatDaggerButton" class="secondary">Get / equip Cheat Dagger</button>
+            <button type="button" id="cheatArmorButton" class="secondary">Get / equip Cheat Armor</button>
+          </div>
+          <p id="cheatStatus" role="status" aria-live="polite"></p>
+        </section>
         <div class="dialog-actions"><button type="button" class="ghost small" data-close-dialog="settingsDialog">Close</button></div>
       </section>
     </dialog>
@@ -1189,6 +1263,8 @@
         cities: [],
         cityPopulationSeeded: false,
         pendingShop: null,
+        pendingCasino: null,
+        cheatUnlocked: false,
         pendingCombat: null,
         quests: [],
         pendingQuest: null,
@@ -1202,6 +1278,7 @@
       const CITY_RADIUS_KM = 4;
       const SAVE_SLOT_COUNT = 5;
       const SAVE_SLOT_PREFIX = "turnmaker-tactics-save-";
+      const rouletteRedNumbers = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
       let aiTurnTimer = null;
       let pickpocketClock = null;
       let pickpocketSliderTimer = null;
@@ -1294,6 +1371,30 @@
         saveGameButton: document.getElementById("saveGameButton"),
         loadGameButton: document.getElementById("loadGameButton"),
         saveLoadStatus: document.getElementById("saveLoadStatus"),
+        cheatUnlockForm: document.getElementById("cheatUnlockForm"),
+        cheatCodeInput: document.getElementById("cheatCodeInput"),
+        secretCodeStatus: document.getElementById("secretCodeStatus"),
+        cheatControls: document.getElementById("cheatControls"),
+        cheatMoneyValue: document.getElementById("cheatMoneyValue"),
+        cheatRelationshipTarget: document.getElementById("cheatRelationshipTarget"),
+        cheatRelationshipValue: document.getElementById("cheatRelationshipValue"),
+        cheatHpValue: document.getElementById("cheatHpValue"),
+        cheatSpValue: document.getElementById("cheatSpValue"),
+        cheatMpValue: document.getElementById("cheatMpValue"),
+        applyCheatsButton: document.getElementById("applyCheatsButton"),
+        cheatDaggerButton: document.getElementById("cheatDaggerButton"),
+        cheatArmorButton: document.getElementById("cheatArmorButton"),
+        cheatStatus: document.getElementById("cheatStatus"),
+        casinoDialog: document.getElementById("casinoDialog"),
+        casinoTitle: document.getElementById("casinoTitle"),
+        casinoMessage: document.getElementById("casinoMessage"),
+        casinoGame: document.getElementById("casinoGame"),
+        casinoBetTypeLabel: document.getElementById("casinoBetTypeLabel"),
+        casinoBetType: document.getElementById("casinoBetType"),
+        casinoWager: document.getElementById("casinoWager"),
+        casinoPlayButton: document.getElementById("casinoPlayButton"),
+        casinoLeaveButton: document.getElementById("casinoLeaveButton"),
+        casinoResult: document.getElementById("casinoResult"),
         questDialog: document.getElementById("questDialog"),
         questForm: document.getElementById("questForm"),
         questTitle: document.getElementById("questTitle"),
@@ -2810,7 +2911,7 @@
           state.currentIndex = 0;
           return;
         }
-        if (state.pickpocket || state.relationshipEvent || state.demonBargain || state.pendingSummonerId || state.pendingQuest || state.pendingShop || state.pendingCombat) return;
+        if (state.pickpocket || state.relationshipEvent || state.demonBargain || state.pendingSummonerId || state.pendingQuest || state.pendingShop || state.pendingCasino || state.pendingCombat) return;
 
         if (state.currentIndex >= state.entities.length) {
           state.currentIndex = 0;
@@ -3325,7 +3426,7 @@
         });
 
         const activeEntity = state.entities[state.currentIndex];
-        const playerTurn = Boolean(activeEntity && activeEntity.isPlayer && activeEntity.hp > 0 && activeEntity.stamina > 0 && !activeEntity.turnUsed && !state.pickpocket && !state.relationshipEvent && !state.pendingSummonerId && !state.pendingQuest && !state.pendingShop && !state.pendingCombat);
+        const playerTurn = Boolean(activeEntity && activeEntity.isPlayer && activeEntity.hp > 0 && activeEntity.stamina > 0 && !activeEntity.turnUsed && !state.pickpocket && !state.relationshipEvent && !state.pendingSummonerId && !state.pendingQuest && !state.pendingShop && !state.pendingCasino && !state.pendingCombat);
         elements.turnPrompt.textContent = activeEntity && activeEntity.isPlayer && activeEntity.hp <= 0
             ? "You have been defeated."
           : playerTurn ? "Your turn" : activeEntity ? "The world is taking its turn..." : "No active turn";
@@ -3448,6 +3549,303 @@
         renderShopStock(city);
         renderShopSellers(actor);
         if (!elements.shopDialog.open) elements.shopDialog.showModal();
+      }
+
+      function openCityCasino(actor, city) {
+        state.pendingCasino = { actorId: actor.id, cityId: city.id };
+        elements.casinoTitle.textContent = `${city.name} Casino`;
+        const maximumWager = maximumCasinoWager(actor);
+        elements.casinoMessage.textContent = `Choose a game and wager. Your maximum wager is ${maximumWager} coins (up to 1,000 beyond your balance).`;
+        elements.casinoResult.textContent = "";
+        elements.casinoWager.max = String(maximumWager);
+        elements.casinoBetTypeLabel.hidden = elements.casinoGame.value !== "roulette";
+        elements.casinoPlayButton.disabled = false;
+        elements.casinoWager.disabled = false;
+        if (!elements.casinoDialog.open) elements.casinoDialog.showModal();
+      }
+
+      function drawCardValue() {
+        const rank = Math.floor(Math.random() * 13) + 1;
+        return rank === 1 ? 11 : Math.min(rank, 10);
+      }
+
+      function blackjackTotal(cards) {
+        let total = cards.reduce((sum, card) => sum + card, 0);
+        let aces = cards.filter((card) => card === 11).length;
+        while (total > 21 && aces > 0) {
+          total -= 10;
+          aces -= 1;
+        }
+        return total;
+      }
+
+      function maximumCasinoWager(player) {
+        const safePayoutLimit = Math.floor((Number.MAX_SAFE_INTEGER - Math.max(0, player.money)) / 35);
+        return Math.max(0, Math.min(player.money + 1000, safePayoutLimit));
+      }
+
+      function holdemHandScore() {
+        const cards = Array.from({ length: 7 }, () => Math.floor(Math.random() * 13) + 2);
+        const counts = cards.reduce((result, rank) => {
+          result[rank] = (result[rank] || 0) + 1;
+          return result;
+        }, {});
+        const groups = Object.values(counts).sort((first, second) => second - first);
+        const category = groups[0] >= 4 ? 7 : groups[0] === 3 && groups[1] >= 2 ? 6
+          : groups[0] === 3 ? 3 : groups[0] === 2 && groups[1] === 2 ? 2 : groups[0] === 2 ? 1 : 0;
+        return category * 20 + Math.max(...cards);
+      }
+
+      function settleCasinoGame(player, wager, netChange, resultText) {
+        player.money += netChange;
+        if (player.money < 0) ensureCasinoCollectors(player);
+        else clearCasinoCollectors(player);
+        elements.casinoResult.textContent = `${resultText} ${player.money.toLocaleString()} coins remaining.`;
+        addLog(`<strong>${escapeHtml(player.name)}</strong> plays at the casino: ${escapeHtml(resultText)} Wager: ${wager} coins; balance: ${player.money} coins.`);
+        state.pendingCasino = null;
+        elements.casinoDialog.close();
+        player.turnUsed = true;
+        render();
+        finishActorTurn(player);
+      }
+
+      function finishCasinoAction(leaving = false) {
+        const actor = state.entities.find((entity) => entity.id === state.pendingCasino?.actorId);
+        state.pendingCasino = null;
+        if (elements.casinoDialog.open) elements.casinoDialog.close();
+        if (!actor) {
+          render();
+          return;
+        }
+        if (leaving) addLog(`<strong>${escapeHtml(actor.name)}</strong> leaves the casino.`);
+        actor.turnUsed = true;
+        finishActorTurn(actor);
+      }
+
+      function playCasinoGame() {
+        const actor = state.entities.find((entity) => entity.id === state.pendingCasino?.actorId);
+        if (!actor || !actor.isPlayer || actor.turnUsed) {
+          elements.casinoResult.textContent = "The casino session is no longer active.";
+          return;
+        }
+        const wager = Number(elements.casinoWager.value);
+        const maximumWager = maximumCasinoWager(actor);
+        if (!Number.isSafeInteger(wager) || wager < 1 || wager > maximumWager) {
+          elements.casinoResult.textContent = `Enter a whole-number wager from 1 to ${maximumWager} coins.`;
+          return;
+        }
+
+        const game = elements.casinoGame.value;
+        if (game === "blackjack") {
+          const playerCards = [drawCardValue(), drawCardValue()];
+          const dealerCards = [drawCardValue(), drawCardValue()];
+          while (blackjackTotal(playerCards) < 17) playerCards.push(drawCardValue());
+          while (blackjackTotal(dealerCards) < 17) dealerCards.push(drawCardValue());
+          const playerTotal = blackjackTotal(playerCards);
+          const dealerTotal = blackjackTotal(dealerCards);
+          const playerBlackjack = playerCards.length === 2 && playerTotal === 21;
+          const dealerBlackjack = dealerCards.length === 2 && dealerTotal === 21;
+          const won = playerTotal <= 21 && (dealerTotal > 21 || playerTotal > dealerTotal || (playerBlackjack && !dealerBlackjack));
+          if (playerBlackjack && !dealerBlackjack) {
+            settleCasinoGame(actor, wager, Math.floor(wager * 1.5), `Blackjack! Your ${playerTotal} beats the dealer's ${dealerTotal}; you win ${Math.floor(wager * 1.5)} coins.`);
+          } else if (won) {
+            settleCasinoGame(actor, wager, wager, `Your ${playerTotal} beats the dealer's ${dealerTotal}; you win ${wager} coins.`);
+          } else if (playerTotal === dealerTotal && !playerBlackjack && !dealerBlackjack) {
+            settleCasinoGame(actor, wager, 0, `Push: both hands total ${playerTotal}; your wager is returned.`);
+          } else {
+            settleCasinoGame(actor, wager, -wager, `The dealer's ${dealerTotal} beats your ${playerTotal}; you lose ${wager} coins.`);
+          }
+          return;
+        }
+
+        if (game === "holdem") {
+          const playerScore = holdemHandScore();
+          const houseScore = holdemHandScore();
+          if (playerScore > houseScore) {
+            settleCasinoGame(actor, wager, wager, `Your Texas Hold'em hand beats the house (${playerScore} to ${houseScore}); you win ${wager} coins.`);
+          } else if (playerScore === houseScore) {
+            settleCasinoGame(actor, wager, 0, `The Texas Hold'em hand ties the house (${playerScore}); your wager is returned.`);
+          } else {
+            settleCasinoGame(actor, wager, -wager, `The house wins Texas Hold'em (${houseScore} to ${playerScore}); you lose ${wager} coins.`);
+          }
+          return;
+        }
+
+        if (game === "slots") {
+          const symbols = ["🍒", "🍋", "🔔", "⭐", "💎"];
+          const result = Array.from({ length: 3 }, () => randomFrom(symbols));
+          const matchingCount = Math.max(...symbols.map((symbol) => result.filter((entry) => entry === symbol).length));
+          const netChange = matchingCount === 3 ? wager * 4 : matchingCount === 2 ? wager : -wager;
+          const outcome = matchingCount === 3 ? `Three ${result[0]} symbols!` : matchingCount === 2 ? `${result.join(" ")} — two match!` : `${result.join(" ")} — no match.`;
+          settleCasinoGame(actor, wager, netChange, `${outcome} ${netChange > 0 ? `You win ${netChange} coins.` : `You lose ${wager} coins.`}`);
+          return;
+        }
+
+        if (game === "roulette") {
+          const result = Math.floor(Math.random() * 37);
+          const color = result === 0 ? "green" : rouletteRedNumbers.includes(result) ? "red" : "black";
+          const betType = elements.casinoBetType.value;
+          const won = color === betType;
+          const netChange = won ? betType === "green" ? wager * 35 : wager : -wager;
+          settleCasinoGame(actor, wager, netChange, `Roulette lands on ${result} ${color}. ${won ? `You win ${netChange} coins.` : `You lose ${wager} coins.`}`);
+          return;
+        }
+
+        if (game === "fate") {
+          const result = Math.floor(Math.random() * 20) + 1;
+          const won = result >= 17;
+          const netChange = won ? wager * 4 : -(Math.max(0, actor.money) + wager);
+          settleCasinoGame(actor, wager, netChange, `The Fate Wheel shows ${result}. ${won ? `You win ${netChange} coins (5× total return).` : `The nonlethal wheel wipes out your balance and leaves a ${wager}-coin debt.`}`);
+        }
+      }
+
+      function ensureCasinoCollectors(player) {
+        if (state.entities.some((entity) => entity.isCasinoCollector && entity.hp > 0)) return;
+        for (let index = 1; index <= 2; index += 1) {
+          const collector = addEntity({
+            name: `Casino Debt Collector ${index}`,
+            type: "human",
+            race: "Human",
+            icon: "🕴️",
+            description: "A casino debt collector pursuing unpaid casino debt.",
+            location: { ...player.location },
+            priority: "combat",
+            isCasinoCollector: true,
+            skipImageSearch: true
+          }, false);
+          collector.hostileTo = [player.id];
+        }
+        addLog("Your balance is negative. Casino debt collectors are now pursuing you until the balance is repaid or they are defeated.");
+      }
+
+      function clearCasinoCollectors(player) {
+        if (player.money < 0) return;
+        state.entities.filter((entity) => entity.isCasinoCollector).forEach((collector) => {
+          removeEntity(collector.id, "leaves after the casino debt is repaid", false, false);
+        });
+      }
+
+      function reconcileCasinoCollectors() {
+        const player = currentPlayer();
+        if (player && player.money >= 0) clearCasinoCollectors(player);
+        else if (player && state.entities.some((entity) => entity.isCasinoCollector)
+          && !state.entities.some((entity) => entity.isCasinoCollector && entity.hp > 0)) {
+          player.money = 0;
+          addLog("The casino debt collectors are defeated. Your casino debt is cleared.");
+        }
+      }
+
+      function updateCheatRelationshipOptions() {
+        const previousValue = elements.cheatRelationshipTarget.value;
+        const player = currentPlayer();
+        elements.cheatRelationshipTarget.replaceChildren();
+        state.entities.filter((entity) => entity.id !== player?.id && entity.hp > 0).forEach((entity) => {
+          const option = document.createElement("option");
+          option.value = entity.id;
+          option.textContent = entity.name;
+          elements.cheatRelationshipTarget.appendChild(option);
+        });
+        if (state.entities.some((entity) => entity.id === previousValue)) {
+          elements.cheatRelationshipTarget.value = previousValue;
+        }
+      }
+
+      function updateCheatInterface() {
+        elements.cheatControls.hidden = !state.cheatUnlocked;
+        elements.cheatUnlockForm.hidden = state.cheatUnlocked;
+        elements.cheatCodeInput.value = "";
+        updateCheatRelationshipOptions();
+      }
+
+      function unlockCheats(event) {
+        event.preventDefault();
+        if (elements.cheatCodeInput.value !== "casino") {
+          elements.secretCodeStatus.textContent = "That code wasn't accepted.";
+          return;
+        }
+        state.cheatUnlocked = true;
+        elements.secretCodeStatus.textContent = "";
+        updateCheatInterface();
+        elements.cheatStatus.textContent = "Cheats unlocked.";
+      }
+
+      function applyCheatEdits() {
+        const player = currentPlayer();
+        if (!state.cheatUnlocked || !player) {
+          elements.cheatStatus.textContent = "Unlock cheats and create a character first.";
+          return;
+        }
+        const requestedValues = [
+          ["money", elements.cheatMoneyValue.value, Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER],
+          ["health", elements.cheatHpValue.value, 0, player.maxHp],
+          ["stamina", elements.cheatSpValue.value, 0, player.maxStamina],
+          ["mana", elements.cheatMpValue.value, 0, player.maxMana ?? 0]
+        ];
+        const parsedValues = [];
+        for (const [label, rawValue, minimum, maximum] of requestedValues) {
+          if (rawValue === "") continue;
+          const value = Number(rawValue);
+          if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
+            elements.cheatStatus.textContent = `Enter a whole number for ${label} within the allowed range.`;
+            return;
+          }
+          parsedValues.push([label, value]);
+        }
+        const relationshipValue = elements.cheatRelationshipValue.value;
+        if (relationshipValue !== "") {
+          const target = state.entities.find((entity) => entity.id === elements.cheatRelationshipTarget.value && entity.hp > 0);
+          const value = Number(relationshipValue);
+          if (!target || !Number.isInteger(value) || value < -100 || value > 100) {
+            elements.cheatStatus.textContent = "Choose a living character and a relationship value from -100 to 100.";
+            return;
+          }
+          state.relationships[relationshipKey(player.id, target.id)] = value;
+          state.relationships[relationshipKey(target.id, player.id)] = value;
+        }
+        parsedValues.forEach(([label, value]) => {
+          if (label === "money") player.money = value;
+          if (label === "health") player.hp = value;
+          if (label === "stamina") player.stamina = value;
+          if (label === "mana") player.mana = value;
+        });
+        if (player.money < 0) ensureCasinoCollectors(player);
+        else clearCasinoCollectors(player);
+        elements.cheatMoneyValue.value = "";
+        elements.cheatHpValue.value = "";
+        elements.cheatSpValue.value = "";
+        elements.cheatMpValue.value = "";
+        elements.cheatRelationshipValue.value = "";
+        elements.cheatStatus.textContent = "Character edits applied.";
+        render();
+      }
+
+      function equipCheatItem(isArmor) {
+        const player = currentPlayer();
+        if (!state.cheatUnlocked || !player) {
+          elements.cheatStatus.textContent = "Unlock cheats and create a character first.";
+          return;
+        }
+        const property = isArmor ? "isCheatArmor" : "isCheatDagger";
+        let item = state.objects.find((object) => object[property]);
+        if (!item) {
+          item = {
+            id: makeId(),
+            name: isArmor ? "Cheat Armor" : "Cheat Dagger",
+            type: isArmor ? "Armor" : "Weapon",
+            icon: isArmor ? "🛡️" : "🗡️",
+            description: isArmor ? "Cheat armor prevents all incoming damage." : "An equipped Cheat Dagger defeats any ordinary creature in one melee hit.",
+            size: "small",
+            category: isArmor ? "armor" : "weapon",
+            maxDurability: null,
+            [property]: true
+          };
+          state.objects.push(item);
+        }
+        if (!player.inventory.includes(item.id)) player.inventory.push(item.id);
+        if (isArmor) player.equippedArmorId = item.id;
+        else player.equippedWeaponId = item.id;
+        elements.cheatStatus.textContent = `${item.name} equipped.`;
+        render();
       }
 
       function renderShopStock(city) {
@@ -4112,6 +4510,7 @@
       }
 
       function render() {
+        reconcileCasinoCollectors();
         ensureTurnPointer();
         renderTurnOrder();
         renderEntityList();
@@ -4167,7 +4566,7 @@
           elements.saveLoadStatus.textContent = "Create a character before saving.";
           return;
         }
-        if (state.pendingCombat || state.pendingQuest || state.pendingShop || state.pendingSummonerId
+        if (state.pendingCombat || state.pendingQuest || state.pendingShop || state.pendingCasino || state.pendingSummonerId
           || state.pendingProposal || state.relationshipEvent || state.demonBargain || state.pickpocket) {
           elements.saveLoadStatus.textContent = "Finish the open interaction before saving.";
           return;
@@ -4230,6 +4629,7 @@
             if (entity.characterClass === "healer") entity.healingPower ||= 20;
           });
           updatePlayerClassSummary(currentPlayer());
+          updateCheatInterface();
           document.querySelectorAll("dialog[open]").forEach((dialog) => {
             if (dialog !== elements.settingsDialog) dialog.close();
           });
@@ -4312,6 +4712,7 @@
           isInvulnerable,
           isNetanyahu: Boolean(entityInput.isNetanyahu),
           isGadiEizenkot: Boolean(entityInput.isGadiEizenkot),
+          isCasinoCollector: Boolean(entityInput.isCasinoCollector),
           isPrimeMinister: false,
           naturalStats: null,
           obeysPlayerId: entityInput.obeysPlayerId || "",
@@ -5049,8 +5450,10 @@
       }
 
       function damageAfterArmor(target, damage, ignoreArmor = false) {
+        const equippedArmor = state.objects.find((item) => item.id === target.equippedArmorId);
+        if (equippedArmor?.isCheatArmor) return 0;
         if (ignoreArmor || damage <= 0 || !target.inventory.includes(target.equippedArmorId)) return damage;
-        const armor = state.objects.find((item) => item.id === target.equippedArmorId);
+        const armor = equippedArmor;
         if (!armor || itemCategory(armor) !== "armor" || getObjectDurability(armor) <= 0) return damage;
         wearItem(target, armor);
         return Math.max(1, Math.ceil(damage / 2));
@@ -5209,6 +5612,15 @@
         if (longRange) {
           attacker.resources[ammo] -= 1;
           if (attacker.resources[ammo] <= 0) delete attacker.resources[ammo];
+        }
+        if (!thrown && weapon?.isCheatDagger) {
+          if (target.isInvulnerable || target.isNetanyahu) {
+            addLog(`<strong>${escapeHtml(attacker.name)}</strong> strikes with the Cheat Dagger, but ${escapeHtml(target.name)} cannot be harmed.`);
+          } else {
+            applyDamage(target, target.hp, "is defeated by the Cheat Dagger", true);
+            addLog(`<strong>${escapeHtml(attacker.name)}</strong> defeats ${escapeHtml(target.name)} with the Cheat Dagger.`);
+          }
+          return true;
         }
         const clickCombat = Number.isFinite(options.clickDamage);
         const roll = clickCombat ? null : rollD20(attacker, "strength");
@@ -5935,6 +6347,21 @@
           return;
         }
 
+        if (/^\s*enter\s+(?:the\s+)?casino\b/i.test(actionText)) {
+          const city = actor.cityId ? state.cities.find((entry) => entry.id === actor.cityId) : null;
+          if (!city || distanceBetween(actor, city) > 1) {
+            actor.cityId = "";
+            addLog("You must be inside a city to enter its casino.");
+            elements.actionText.value = "";
+            render();
+            return;
+          }
+          elements.actionText.value = "";
+          openCityCasino(actor, city);
+          render();
+          return;
+        }
+
         if (/^\s*enter\b/i.test(actionText) && !/\b(shop|store|market)\b/i.test(actionText)) {
           if (/^\s*enter\s+(?:the\s+)?wizard tower\s*$/i.test(actionText)) {
             if (actor.characterClass !== "wizard") {
@@ -6373,6 +6800,7 @@
           && !state.pendingSummonerId
           && !state.pendingQuest
           && !state.pendingShop
+          && !state.pendingCasino
           && !state.pendingCombat
           && Number.isFinite(actor.pendingStaminaCost)
           && !actor.turnUsed
@@ -6436,6 +6864,13 @@
         if (state.currentIndex >= state.entities.length) state.currentIndex = 0;
 
         if (logRemoval) addLog(`<strong>${escapeHtml(removed.name)}</strong> ${reason} and disappears from the field.`, removed);
+        if (removed.isCasinoCollector && !state.entities.some((entity) => entity.isCasinoCollector && entity.hp > 0)) {
+          const player = currentPlayer();
+          if (player && player.money < 0) {
+            player.money = 0;
+            addLog("The casino debt collectors are defeated. Your casino debt is cleared.");
+          }
+        }
         if (refresh) {
           render();
           scheduleAiTurn();
@@ -6444,7 +6879,7 @@
 
       function scheduleAiTurn() {
         if (aiTurnTimer) clearTimeout(aiTurnTimer);
-        if (state.pickpocket || state.relationshipEvent || state.demonBargain || state.pendingSummonerId || state.pendingQuest || state.pendingShop || state.pendingCombat) return;
+        if (state.pickpocket || state.relationshipEvent || state.demonBargain || state.pendingSummonerId || state.pendingQuest || state.pendingShop || state.pendingCasino || state.pendingCombat) return;
         if (state.entities.some((entity) => entity.isPlayer && entity.hp <= 0)) return;
         const activeEntity = state.entities[state.currentIndex];
         if (activeEntity && !activeEntity.isPlayer && !activeEntity.turnUsed) {
@@ -6502,7 +6937,7 @@
           ? state.entities.find((entity) => entity.isPlayer && entity.hp > 0)
           : state.entities.find((entity) => actor.hostileTo.includes(entity.id) && entity.hp > 0);
         if (campaignTarget && !isPassiveAnimal(actor)) {
-          if (!failedNetanyahuCampaign && prepareForHostility(actor)) return;
+          if (!failedNetanyahuCampaign && !actor.isCasinoCollector && prepareForHostility(actor)) return;
           if (failedNetanyahuCampaign) {
             const weapon = findUsableWeapon(actor);
             const attackRange = weapon?.range || 0;
@@ -6538,7 +6973,7 @@
 
         const hatedTarget = state.entities.find((entity) => actor.hostileTo.includes(entity.id) && entity.hp > 0);
         if (hatedTarget && !isPassiveAnimal(actor)) {
-          if (prepareForHostility(actor)) return;
+          if (!actor.isCasinoCollector && prepareForHostility(actor)) return;
           const weapon = findUsableWeapon(actor);
           const attackRange = weapon?.range || 0;
           if (distanceInSquares(actor, hatedTarget) > attackRange) {
@@ -6781,12 +7216,29 @@
         const openSettings = () => {
           elements.saveLoadStatus.textContent = "";
           updateSaveSlotOptions();
+          updateCheatInterface();
           if (!elements.settingsDialog.open) elements.settingsDialog.showModal();
         };
         elements.settingsBtn.addEventListener("click", openSettings);
         elements.setupSettingsButton.addEventListener("click", openSettings);
         elements.saveGameButton.addEventListener("click", saveGameToSelectedSlot);
         elements.loadGameButton.addEventListener("click", loadGameFromSelectedSlot);
+        elements.cheatUnlockForm.addEventListener("submit", unlockCheats);
+        elements.applyCheatsButton.addEventListener("click", applyCheatEdits);
+        elements.cheatDaggerButton.addEventListener("click", () => equipCheatItem(false));
+        elements.cheatArmorButton.addEventListener("click", () => equipCheatItem(true));
+        elements.casinoGame.addEventListener("change", () => {
+          elements.casinoBetTypeLabel.hidden = elements.casinoGame.value !== "roulette";
+        });
+        elements.casinoPlayButton.addEventListener("click", playCasinoGame);
+        elements.casinoLeaveButton.addEventListener("click", () => finishCasinoAction(true));
+        elements.casinoDialog.addEventListener("cancel", (event) => {
+          event.preventDefault();
+          finishCasinoAction(true);
+        });
+        elements.casinoDialog.addEventListener("click", (event) => {
+          if (event.target === elements.casinoDialog) event.preventDefault();
+        });
         document.querySelectorAll("[data-close-dialog]").forEach((button) => {
           button.addEventListener("click", () => document.getElementById(button.dataset.closeDialog).close());
         });
