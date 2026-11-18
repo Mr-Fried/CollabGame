@@ -1831,6 +1831,9 @@
       const cityNameStarts = ["Alder", "Bright", "Cedar", "Dawn", "Eagle", "Fair", "Gold", "Haven", "Iron", "Juniper", "Kings", "Lumen", "Moon", "North", "Oak", "Pine", "Quiet", "River", "Silver", "Thorn"];
       const cityNameEnds = ["bay", "bridge", "crest", "fall", "field", "ford", "gate", "haven", "meadow", "mere", "reach", "rest", "ridge", "rock", "shore", "stead", "vale", "watch", "wick", "wood"];
       const givenNames = ["Ari", "Bryn", "Cato", "Dara", "Eli", "Fara", "Galen", "Hana", "Ivo", "Jori", "Kira", "Lio", "Mira", "Niko", "Orin", "Pia", "Quin", "Rhea", "Soren", "Tavi", "Uma", "Vera", "Wren", "Yara", "Zane"];
+      const harediMaleNames = ["Aharon", "Avraham", "Chaim", "David", "Eliyahu", "Moshe", "Naftali", "Shimon", "Uri", "Yosef"];
+      const harediFemaleNames = ["Chaya", "Esther", "Hadas", "Leah", "Miriam", "Rachel", "Rivka", "Sara", "Shira", "Tova"];
+      const harediSurnames = ["Adler", "Goldberg", "Levi", "Rosen", "Stern", "Weiss"];
       const shopCatalog = [
         { name: "Wooden Knife", type: "Weapon", category: "weapon", icon: "🔪", durability: 20, price: 35 },
         { name: "Stone Knife", type: "Weapon", category: "weapon", icon: "🗡️", durability: 35, price: 60 },
@@ -1921,6 +1924,22 @@
             state.cities.push(city);
           }
         });
+        const bneiBrak = {
+          id: makeId(),
+          name: "Bnei Brak",
+          race: "Human",
+          community: "Haredi",
+          icon: "🕍",
+          location: randomCityLocation(state.cities),
+          shop: {
+            stock: shopCatalog.map((item) => ({
+              ...item,
+              maxDurability: item.durability ?? null,
+              description: `${item.name}, available at Bnei Brak's city shop.`
+            }))
+          }
+        };
+        state.cities.push(bneiBrak);
         elements.playerStartCity.innerHTML = state.cities.map((city) =>
           `<option value="${escapeHtml(city.id)}">${escapeHtml(city.name)} (${escapeHtml(city.race)})</option>`
         ).join("");
@@ -1937,16 +1956,23 @@
               x: Math.max(0, Math.min(state.worldWidth, city.location.x + (Math.random() * 2 - 1) * 2)),
               y: Math.max(0, Math.min(state.worldHeight, city.location.y + (Math.random() * 2 - 1) * 2))
             };
+            const isBneiBrak = city.name === "Bnei Brak";
+            const residentName = isBneiBrak
+              ? `${randomFrom(gender === "male" ? harediMaleNames : harediFemaleNames)} ${randomFrom(harediSurnames)}`
+              : `${randomFrom(givenNames)} ${randomFrom(cityNameEnds)}`;
             addEntity({
-              name: `${randomFrom(givenNames)} ${randomFrom(cityNameEnds)}`,
+              name: residentName,
               type: city.race,
               race: city.race,
               gender,
               sexuality: gender === "male" ? randomFrom(["straight", "bisexual", "gay"]) : randomFrom(["straight", "bisexual", "lesbian"]),
               age: Math.floor(Math.random() * 50) + 18,
               skinTone: city.race === "Human" ? randomFrom(["white", "black", "brown"]) : "",
-              icon: randomFrom(iconChoices(city.race, gender)),
-              description: `A resident of ${city.name}.`,
+              icon: isBneiBrak ? (gender === "male" ? "🧔" : "👩") : randomFrom(iconChoices(city.race, gender)),
+              description: isBneiBrak ? "A Haredi resident of Bnei Brak, known for learning, intelligence, and wisdom." : `A resident of ${city.name}.`,
+              community: isBneiBrak ? "Haredi" : "",
+              traits: isBneiBrak ? ["Smart", "Wise"] : undefined,
+              traitModifiers: isBneiBrak ? { Smart: 6, Wise: 6 } : undefined,
               location,
               cityId: city.id,
               cityResident: true,
@@ -2439,6 +2465,49 @@
           render();
           scheduleAiTurn();
         }
+      }
+
+      function offerMinyanInvitation(actor, player) {
+        if (!actor || !player || actor.community !== "Haredi" || actor.hp <= 0 || player.hp <= 0) return false;
+        if (actor.lastMinyanRequestDay && state.day - actor.lastMinyanRequestDay < 5) return false;
+
+        actor.lastMinyanRequestDay = state.day;
+        state.deferredTurnActorId = actor.id;
+        state.relationshipEvent = {
+          title: `${actor.name} asks you to join their Minyan`,
+          message: "Would you like to join the Minyan prayer quorum with them?",
+          choices: [
+            {
+              label: "Yes, join the Minyan",
+              action: () => {
+                changeRapport(player.id, actor.id, 15);
+                changeRapport(actor.id, player.id, 15);
+                addLog(`<strong>${escapeHtml(player.name)}</strong> joins <strong>${escapeHtml(actor.name)}</strong> for Minyan. Relationship +15 points.`);
+                finishRelationshipEvent();
+              }
+            },
+            {
+              label: "Maybe another time",
+              action: () => {
+                changeRapport(player.id, actor.id, -2);
+                changeRapport(actor.id, player.id, -2);
+                addLog(`<strong>${escapeHtml(player.name)}</strong> politely postpones <strong>${escapeHtml(actor.name)}</strong>'s Minyan invitation. Relationship -2 points.`);
+                finishRelationshipEvent();
+              }
+            },
+            {
+              label: "No, I don't want to join",
+              action: () => {
+                changeRapport(player.id, actor.id, -10);
+                changeRapport(actor.id, player.id, -10);
+                addLog(`<strong>${escapeHtml(player.name)}</strong> declines <strong>${escapeHtml(actor.name)}</strong>'s Minyan invitation. Relationship -10 points.`);
+                finishRelationshipEvent();
+              }
+            }
+          ]
+        };
+        render();
+        return true;
       }
 
       function establishRelationship(first, second) {
@@ -3999,9 +4068,10 @@
           const y = entity.location.y;
           return `<g><title>${escapeHtml(entity.name)} — ${escapeHtml(entity.type)} (${Math.floor(x / MAP_SQUARE_KM)}, ${Math.floor(y / MAP_SQUARE_KM)} grid square)</title><circle cx="${x}" cy="${y}" r="45" fill="${entity.isPlayer ? "#22c1ff" : "#8b5cf6"}" stroke="#edf3ff" stroke-width="8"></circle><text x="${x}" y="${y + 20}" text-anchor="middle" font-size="72">${escapeHtml(entity.icon || "✨")}</text><text class="world-map-label" x="${x + 60}" y="${y - 12}">${escapeHtml(entity.name)}</text></g>`;
         }).join("");
-        const cityMarkers = state.cities.map((city) =>
-          `<g><title>${escapeHtml(city.name)} — ${escapeHtml(city.race)} city (20 residents), with a shop</title><circle cx="${city.location.x}" cy="${city.location.y}" r="80" fill="#f3c969" stroke="#312e28" stroke-width="12"></circle><text x="${city.location.x}" y="${city.location.y + 24}" text-anchor="middle" font-size="80">${city.icon}</text><text x="${city.location.x + 58}" y="${city.location.y - 50}" text-anchor="middle" font-size="52">🏪</text><text class="world-map-label" x="${city.location.x + 90}" y="${city.location.y - 20}">${escapeHtml(city.name)}</text></g>`
-        ).join("");
+        const cityMarkers = state.cities.map((city) => {
+          const communityLabel = city.community ? ` — ${escapeHtml(city.community)} community` : "";
+          return `<g><title>${escapeHtml(city.name)} — ${escapeHtml(city.race)} city${communityLabel} (20 residents), with a shop</title><circle cx="${city.location.x}" cy="${city.location.y}" r="80" fill="#f3c969" stroke="#312e28" stroke-width="12"></circle><text x="${city.location.x}" y="${city.location.y + 24}" text-anchor="middle" font-size="80">${city.icon}</text><text x="${city.location.x + 58}" y="${city.location.y - 50}" text-anchor="middle" font-size="52">🏪</text><text class="world-map-label" x="${city.location.x + 90}" y="${city.location.y - 20}">${escapeHtml(city.name)}</text></g>`;
+        }).join("");
         const tower = state.wizardTower
           ? `<g><title>Wizard Tower — entry restricted to Wizards and Witches</title><circle cx="${state.wizardTower.location.x}" cy="${state.wizardTower.location.y}" r="90" fill="#a78bfa" stroke="#312e28" stroke-width="12"></circle><text x="${state.wizardTower.location.x}" y="${state.wizardTower.location.y + 24}" text-anchor="middle" font-size="80">🧙</text><text class="world-map-label" x="${state.wizardTower.location.x + 100}" y="${state.wizardTower.location.y - 20}">Wizard Tower</text></g>`
           : "";
@@ -4616,10 +4686,16 @@
           if (aiTurnTimer) clearTimeout(aiTurnTimer);
           aiTurnTimer = null;
           Object.assign(state, savedState);
+          const bneiBrakCity = state.cities.find((city) => city.name === "Bnei Brak");
+          if (bneiBrakCity) bneiBrakCity.community = "Haredi";
           state.entities.forEach((entity) => {
             if (entity.isInvulnerable) {
               entity.hp = Infinity;
               entity.maxHp = Infinity;
+            }
+            if (bneiBrakCity && entity.cityId === bneiBrakCity.id) {
+              entity.community = "Haredi";
+              entity.lastMinyanRequestDay ??= 0;
             }
             if (entity.characterClass === "wizard") {
               entity.knownSpells ||= [...startingWizardSpells];
@@ -4680,11 +4756,13 @@
           relationshipStatus: entityInput.relationshipStatus || "unspecified",
           gender: entityInput.gender || "unspecified",
           sexuality: entityInput.sexuality || "straight",
+          community: entityInput.community || "",
           priority: entityInput.priority || randomFrom(creaturePriorities)[0],
           age: entityInput.age ?? null,
           skinTone: entityInput.skinTone || "",
           cityId: entityInput.cityId || "",
           cityResident: Boolean(entityInput.cityResident),
+          lastMinyanRequestDay: Number.isFinite(entityInput.lastMinyanRequestDay) ? entityInput.lastMinyanRequestDay : 0,
           money: Number.isFinite(entityInput.money) ? entityInput.money : 0,
           isChild: Boolean(entityInput.isChild),
           parentIds: entityInput.parentIds || [],
@@ -6395,6 +6473,35 @@
           return;
         }
 
+        if (/\b(minyan|prayer quorum)\b/i.test(actionText)) {
+          if (!target) {
+            addLog("Type “ask [Haredi resident name] about joining the Minyan” while in Bnei Brak.");
+            elements.actionText.value = "";
+            render();
+            return;
+          }
+          if (target.community !== "Haredi") {
+            addLog(`<strong>${escapeHtml(target.name)}</strong> is not a Haredi resident of Bnei Brak.`);
+            elements.actionText.value = "";
+            render();
+            return;
+          }
+          if (!sameMapSquare(actor, target)) {
+            addLog(`You must be in the same 500-meter map square as ${escapeHtml(target.name)} to ask about their Minyan.`);
+            elements.actionText.value = "";
+            render();
+            return;
+          }
+          actor.turnUsed = true;
+          elements.actionText.value = "";
+          if (offerMinyanInvitation(target, actor)) render();
+          else {
+            addLog(`<strong>${escapeHtml(target.name)}</strong> asked you to join recently. Give it at least five days before asking again.`);
+            finishActorTurn(actor);
+          }
+          return;
+        }
+
         if (/\b(visit|enter|go to|shop|buy|sell)\b.*\b(shop|store|market)\b|\b(shop|store|market)\b/i.test(actionText)) {
           const city = actor.cityId ? state.cities.find((entry) => entry.id === actor.cityId) : null;
           if (!city || distanceBetween(actor, city) > 1) {
@@ -7000,6 +7107,14 @@
           addLog(`<strong>${escapeHtml(actor.name)}</strong> moves away from ${escapeHtml(suspiciousTarget.name)} and stays on guard.`);
           finishActorTurn(actor, true);
           return;
+        }
+
+        if (actor.community === "Haredi" && player && sameMapSquare(actor, player)
+          && actor.cityId === player.cityId
+          && (!actor.lastMinyanRequestDay || state.day - actor.lastMinyanRequestDay >= 5)
+          && Math.random() < 0.08) {
+          actor.turnUsed = true;
+          if (offerMinyanInvitation(actor, player)) return;
         }
 
         if (actor.cityResident && player && state.playerQuestRequestDay !== state.day
